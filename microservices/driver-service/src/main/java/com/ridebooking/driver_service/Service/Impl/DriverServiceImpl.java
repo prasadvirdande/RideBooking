@@ -13,6 +13,7 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.UUID;
 
 
 @Service
@@ -63,6 +64,14 @@ public class DriverServiceImpl implements DriverService {
     @Override
     public DriverLocationResponseDto updateDriverLocation(DriverLocationUpdateDto driverLocationUpdateDto) {
         Driver driver = driverepo.findById(driverLocationUpdateDto.getDriverId()).orElseThrow(() -> new RuntimeException("Driver not found"));
+        System.out.println(
+                "Updating location for driver ID = "
+                        + driverLocationUpdateDto.getDriverId()
+        );
+        System.out.println(
+                "Driver fetched from DB = "
+                        + driver.getId()
+        );
         redisTemplate.opsForGeo().add(
                 "driver-location",
                 new Point(driverLocationUpdateDto.getLongitude(), driverLocationUpdateDto.getLatitude()),
@@ -109,6 +118,12 @@ public class DriverServiceImpl implements DriverService {
                 driver.getPassword(),
                 driver.getRole().name()
         );
+    }
+
+    @Override
+    public DriverResponseDto getDriverById(String driverId) {
+        Driver driver = driverepo.findById(UUID.fromString(driverId)).orElseThrow(() -> new RuntimeException("Driver not found"));
+        return mapToDriverResponseDto(driver);
     }
 
 

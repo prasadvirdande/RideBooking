@@ -47,7 +47,7 @@ public class UserController {
     }
 
 
-    @GetMapping("/{userId}")
+    @GetMapping("/id/{userId}")
     public ResponseEntity<UserResponseDto> getUserById(
             @PathVariable UUID userId
     ) {

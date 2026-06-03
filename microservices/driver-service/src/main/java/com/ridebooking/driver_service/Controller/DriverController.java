@@ -31,6 +31,10 @@ public class DriverController {
     public ResponseEntity<DriverLoginResponseDTO> loginDriver(@RequestBody DriverLoginRequestDto driverRequestDto) {
         return ResponseEntity.ok(driverService.loginDriver(driverRequestDto));
     }
+    @GetMapping("/id/{driverId}")
+    public ResponseEntity<DriverResponseDto> getDriverById(@PathVariable String driverId) {
+        return ResponseEntity.ok(driverService.getDriverById(driverId));
+    }
 
     @PutMapping("/location")
     public ResponseEntity<DriverLocationResponseDto> updateDriverLocation(@RequestBody DriverLocationUpdateDto driverLocationUpdateDto) {
