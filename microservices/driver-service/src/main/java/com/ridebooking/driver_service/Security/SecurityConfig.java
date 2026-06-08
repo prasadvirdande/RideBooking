@@ -27,7 +27,8 @@ public class SecurityConfig {
                                 "/api/driver/login",
                                 "/api/driver/nearby",
                                 "/api/users/search/ride",
-                                "/api/driver/id/**"
+                                "/api/driver/id/**",
+                                "/api/driver/accept/ride"
                         ).permitAll()
                         .anyRequest().authenticated())
                 .sessionManagement(session->session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

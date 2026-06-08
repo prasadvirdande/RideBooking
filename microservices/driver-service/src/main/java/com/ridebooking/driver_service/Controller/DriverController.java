@@ -53,4 +53,9 @@ public class DriverController {
                 )
         );
     }
+    @PostMapping("/accept/ride")
+    public ResponseEntity<String> acceptRide(@RequestBody AcceptRideRequest driverId) {
+        driverService.acceptRide(driverId);
+        return ResponseEntity.ok("Driver is Busy");
+    }
 }

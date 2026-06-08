@@ -28,7 +28,8 @@ public class SecurityConfig {
                 authorizeHttpRequests(
                         auth -> auth
                                 .requestMatchers("/api/users/id/{userId}",
-                                        "/api/driver/id/{driverId}"
+                                        "/api/driver/id/{driverId}",
+                                        "/api/driver/accept/ride"
 
 
 

@@ -20,4 +20,6 @@ public interface DriverService {
     DriverLoginResponseDTO loginDriver(DriverLoginRequestDto driverRequestDto);
 
     DriverResponseDto getDriverById(String driverId);
+
+    void acceptRide(AcceptRideRequest driverId);
 }

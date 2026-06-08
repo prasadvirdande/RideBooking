@@ -2,6 +2,7 @@ package com.ridebooking.driver_service.Service.Impl;
 
 import com.ridebooking.driver_service.DTO.*;
 import com.ridebooking.driver_service.Entity.Driver;
+import com.ridebooking.driver_service.Enum.DriverStatus;
 import com.ridebooking.driver_service.Enum.Role;
 import com.ridebooking.driver_service.Repository.Driverepo;
 import com.ridebooking.driver_service.Service.DriverService;
@@ -124,6 +125,20 @@ public class DriverServiceImpl implements DriverService {
     public DriverResponseDto getDriverById(String driverId) {
         Driver driver = driverepo.findById(UUID.fromString(driverId)).orElseThrow(() -> new RuntimeException("Driver not found"));
         return mapToDriverResponseDto(driver);
+    }
+
+    @Override
+    public void acceptRide(AcceptRideRequest driverId) {
+
+        System.out.println("Driver ID received: " + driverId);
+
+        Driver driver = driverepo.findById(
+                UUID.fromString(driverId.getDriverId())
+        ).orElseThrow(() -> new RuntimeException("Driver not found"));
+
+
+        driver.setStatus(DriverStatus.BUSY);
+        driverepo.save(driver);
     }
 
 
