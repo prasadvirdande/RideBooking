@@ -1,11 +1,13 @@
 package com.ridebooking.ride_service.Service.Impl;
 
 import com.ridebooking.ride_service.DTO.*;
+import com.ridebooking.ride_service.DTO.Event.RideAcceptedRideEvent;
 import com.ridebooking.ride_service.Entity.Ride;
 import com.ridebooking.ride_service.Enums.RideStatus;
 import com.ridebooking.ride_service.Feign.DriverFeign;
 import com.ridebooking.ride_service.Feign.UserFeign;
 import com.ridebooking.ride_service.Repository.RideRepo;
+import com.ridebooking.ride_service.Service.Kafka.RideProducer;
 import com.ridebooking.ride_service.Service.RideService;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
@@ -24,10 +26,11 @@ public class RideServiceImpl implements RideService {
     private final RideProducer rideProducer;
     private final RedisTemplate<String, String> redisTemplate;
 
-    public RideServiceImpl(RideRepo rideRepository, UserFeign userFeign, DriverFeign driverFeign, RedisTemplate<String, String> redisTemplate) {
+    public RideServiceImpl(RideRepo rideRepository, UserFeign userFeign, DriverFeign driverFeign, RideProducer rideProducer, RedisTemplate<String, String> redisTemplate) {
         this.rideRepository = rideRepository;
         this.userFeign = userFeign;
         this.driverFeign = driverFeign;
+        this.rideProducer = rideProducer;
         this.redisTemplate = redisTemplate;
     }
 
@@ -151,7 +154,13 @@ public class RideServiceImpl implements RideService {
                 otp,
                 Duration.ofMinutes(60)
         );
-        driverFeign.acceptRide(rideRequest);
+        //driverFeign.acceptRide(rideRequest);
+        RideAcceptedRideEvent rideAcceptedRideEvent = new RideAcceptedRideEvent(
+                saveRide.getId().toString(),
+                saveRide.getDriverId().toString()
+
+        );
+        rideProducer.publishRideAccepted(rideAcceptedRideEvent);
 
         return AcceptedRideResponseDTO.builder()
                 .rideId(saveRide.getId().toString())

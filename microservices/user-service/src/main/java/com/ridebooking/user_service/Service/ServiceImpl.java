@@ -20,6 +20,7 @@ public class ServiceImpl implements UserService {
 
     private final UserRepo userRepo;
     private final DriverClient driverClient;
+
     @Override
     public UserResponseDto getProfile() {
 
@@ -167,13 +168,32 @@ public class ServiceImpl implements UserService {
     }
 
     @Override
-    public UserLoginResponseDTO loginUser(UserLoginRequestDTO userLoginDTO) {
-        User user = userRepo.findByEmail(userLoginDTO.getEmail())
-                .orElseThrow(() ->
-                        new RuntimeException("User not found!"));
+    public UserLoginResponseDTO loginUser(
+            UserLoginRequestDTO userLoginDTO) {
+
+        long start = System.currentTimeMillis();
+
+        long dbStart = System.currentTimeMillis();
+
+        User user = userRepo.findByEmail(
+                userLoginDTO.getEmail()
+        ).orElseThrow(() ->
+                new RuntimeException("User not found!"));
+
+        System.out.println(
+                "DB QUERY = "
+                        + (System.currentTimeMillis() - dbStart)
+                        + " ms"
+        );
+
+        System.out.println(
+                "TOTAL SERVICE = "
+                        + (System.currentTimeMillis() - start)
+                        + " ms"
+        );
 
         return new UserLoginResponseDTO(
-               user.getEmail(),
+                user.getEmail(),
                 user.getPassword(),
                 user.getRole().name()
         );

@@ -47,6 +47,8 @@ public class AuthController {
 
         AuthResponse response = authService.login(authRequest);
 
+        System.out.println("LOGIN CONTROLLER HIT");
+
         return ResponseEntity
                 .status(HttpStatus.OK)
                 .body(response);

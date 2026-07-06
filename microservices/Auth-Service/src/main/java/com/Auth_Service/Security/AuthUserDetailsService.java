@@ -27,6 +27,11 @@ public class AuthUserDetailsService
         UserDto user =
                 userClient.getByEmail(email);
 
+        System.out.println("User: " + user);
+        System.out.println("Email: " + email);
+        System.out.println("Password: " + user.getPassword());
+        System.out.println("Role: " + user.getRole());
+
         if (user == null) {
 
             throw new UsernameNotFoundException(

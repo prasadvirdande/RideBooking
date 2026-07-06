@@ -4,6 +4,8 @@ import lombok.AllArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.AuthenticationProvider;
+import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -19,18 +21,8 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class AuthSecurity {
 
     private final JwtFilter jwtFilter;
-//    @Bean
-//    public SecurityFilterChain securityFilterChain(HttpSecurity http)
-//            throws Exception {
-//
-//        http
-//                .csrf(csrf -> csrf.disable())
-//                .authorizeHttpRequests(auth -> auth
-//                        .anyRequest().permitAll()
-//                );
-//
-//        return http.build();
-//    }
+    private final AuthUserDetailsService authUserDetailsService;
+
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http)
@@ -43,8 +35,8 @@ public class AuthSecurity {
                         .requestMatchers(
                                 "/api/auth/register",
                                 "/api/auth/login",
-                                "api/users/register",
-                                "api/users/login",
+                                "/api/users/register",
+                                "/api/users/login",
                                 "/api/auth/driver/login",
                                 "/api/auth/driver/register",
                                 "/api/auth/health"
@@ -78,5 +70,22 @@ public class AuthSecurity {
     public BCryptPasswordEncoder bCryptPasswordEncoder() {
 
         return new BCryptPasswordEncoder();
+    }
+
+    @Bean
+    public AuthenticationProvider authenticationProvider() {
+
+        DaoAuthenticationProvider provider =
+                new DaoAuthenticationProvider();
+
+        provider.setUserDetailsService(
+                authUserDetailsService
+        );
+
+        provider.setPasswordEncoder(
+                bCryptPasswordEncoder()
+        );
+
+        return provider;
     }
 }

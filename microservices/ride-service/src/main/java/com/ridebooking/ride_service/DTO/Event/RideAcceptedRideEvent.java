@@ -11,4 +11,6 @@ public class RideAcceptedRideEvent {
 
     private String rideId;
     private String driverId;
+
+
 }
