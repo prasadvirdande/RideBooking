@@ -29,7 +29,11 @@ public class SecurityConfig {
                         auth -> auth
                                 .requestMatchers("/api/users/id/{userId}",
                                         "/api/driver/id/{driverId}",
-                                        "/api/driver/accept/ride"
+                                        "/api/driver/accept/ride",
+                                        "/api/ride",
+                                        "/api/ride/search",
+                                        "/api/ride/id/**",
+                                        "/api/ride/verify/otp"
 
 
 

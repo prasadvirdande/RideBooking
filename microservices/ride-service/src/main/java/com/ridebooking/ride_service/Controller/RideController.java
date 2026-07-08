@@ -6,6 +6,7 @@ import com.ridebooking.ride_service.Service.RideService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -14,9 +15,21 @@ public class RideController {
 
     private final RideService rideService;
 
+
     public RideController(RideService rideService) {
         this.rideService = rideService;
     }
+
+
+    @PostMapping("/search")
+    public ResponseEntity<SearchRideResponseDTO> searchRide(
+            @RequestBody SearchRideRequest request) {
+
+        return ResponseEntity.ok(
+                rideService.searchRide(request)
+        );
+    }
+
 
     @PostMapping
     public ResponseEntity<RideResponseDto> createRide(@RequestBody RideRequest rideRequest) {

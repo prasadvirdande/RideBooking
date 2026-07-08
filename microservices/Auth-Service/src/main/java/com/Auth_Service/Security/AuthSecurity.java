@@ -36,6 +36,8 @@ public class AuthSecurity {
                                 "/api/auth/register",
                                 "/api/auth/login",
                                 "/api/users/register",
+                                "/api/driver/login",
+                                "/api/driver/register",
                                 "/api/users/login",
                                 "/api/auth/driver/login",
                                 "/api/auth/driver/register",

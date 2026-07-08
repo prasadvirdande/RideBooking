@@ -19,5 +19,10 @@ public interface DriverClient {
             @RequestBody LoginRequest request
     );
 
+    @GetMapping("/api/driver/email/{email}")
+    UserDto getByEmail(
+            @PathVariable("email") String email
+    );
+
 
 }

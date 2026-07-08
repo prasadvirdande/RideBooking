@@ -26,4 +26,6 @@ public interface UserClient {
     UserDto getByEmail(
             @PathVariable("email") String email
     );
+
+
 }

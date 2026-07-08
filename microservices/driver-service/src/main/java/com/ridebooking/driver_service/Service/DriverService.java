@@ -11,15 +11,16 @@ public interface DriverService {
     DriverResponseDto createDriver(DriverRequestDto driverRequestDto);
 
     DriverLocationResponseDto updateDriverLocation(DriverLocationUpdateDto driverLocationUpdateDto);
-
-    GeoResults<?> findNearbyDrivers(
+    List<DriverResponseDto> findNearbyDrivers(
             Double latitude,
-            Double longitude);
-
+            Double longitude
+    );
 
     DriverLoginResponseDTO loginDriver(DriverLoginRequestDto driverRequestDto);
 
     DriverResponseDto getDriverById(String driverId);
 
     void acceptRide(AcceptRideRequest driverId);
+
+    DriverResponseDto getDriverByEmail(String email);
 }

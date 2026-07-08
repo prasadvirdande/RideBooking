@@ -11,4 +11,7 @@ public interface RideService {
     AcceptedRideResponseDTO updateRide(UUID rideId, AcceptRideRequest rideRequest);
 
     void verifyOtp(VerifyOtpDTO verifyOtpDTO);
+
+
+    SearchRideResponseDTO searchRide(SearchRideRequest request);
 }

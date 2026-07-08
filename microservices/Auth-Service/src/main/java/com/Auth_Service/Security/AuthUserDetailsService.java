@@ -1,6 +1,7 @@
 package com.Auth_Service.Security;
 
 import com.Auth_Service.DTO.UserDto;
+import com.Auth_Service.Feign.DriverClient;
 import com.Auth_Service.Feign.UserClient;
 import lombok.AllArgsConstructor;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -14,42 +15,47 @@ import java.util.List;
 
 @Service
 @AllArgsConstructor
-public class AuthUserDetailsService
-        implements UserDetailsService {
+public class AuthUserDetailsService implements UserDetailsService {
 
     private final UserClient userClient;
+    private final DriverClient driverClient;
 
     @Override
-    public UserDetails loadUserByUsername(
-            String email
-    ) throws UsernameNotFoundException {
+    public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
 
-        UserDto user =
-                userClient.getByEmail(email);
+        UserDto user = null;
+        UserDto driver = null;
 
-        System.out.println("User: " + user);
-        System.out.println("Email: " + email);
-        System.out.println("Password: " + user.getPassword());
-        System.out.println("Role: " + user.getRole());
+        try {
+            user = userClient.getByEmail(email);
+        } catch (Exception ignored) {
+        }
 
-        if (user == null) {
+        try {
+            driver = driverClient.getByEmail(email);
+        } catch (Exception ignored) {
+        }
 
-            throw new UsernameNotFoundException(
-                    "User not found"
+        if (user != null) {
+            return new User(
+                    user.getEmail(),
+                    user.getPassword(),
+                    List.of(
+                            new SimpleGrantedAuthority("ROLE_" + user.getRole())
+                    )
             );
         }
 
-        return new User(
+        if (driver != null) {
+            return new User(
+                    driver.getEmail(),
+                    driver.getPassword(),
+                    List.of(
+                            new SimpleGrantedAuthority("ROLE_" + driver.getRole())
+                    )
+            );
+        }
 
-                user.getEmail(),
-
-                user.getPassword(),
-
-                List.of(
-                        new SimpleGrantedAuthority(
-                                "ROLE_" + user.getRole()
-                        )
-                )
-        );
+        throw new UsernameNotFoundException("User or Driver not found with email: " + email);
     }
 }

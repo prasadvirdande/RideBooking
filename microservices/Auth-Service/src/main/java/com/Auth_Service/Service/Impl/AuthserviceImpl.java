@@ -78,6 +78,18 @@ public class AuthserviceImpl implements AuthService {
 
         return response;
     }
+
+    @Override
+    public AuthResponse loginDriver(LoginRequest loginRequest) {
+        UserDto driver = driverClient.loginDriver(loginRequest);
+        boolean valid=passwordEncoder.matches(loginRequest.getPassword(),driver.getPassword());
+        if(!valid)throw new RuntimeException("Invalid credentials For Driver");
+        AuthResponse response = new AuthResponse();
+        response.setMessage("Login Successful");
+        response.setToken(jwtservice.generateToken(driver.getEmail(), Set.of(driver.getRole())));
+        return response;
+    }
+
     @Override
     public AuthResponse login(LoginRequest request) {
 
@@ -113,6 +125,7 @@ public class AuthserviceImpl implements AuthService {
 
         AuthResponse response = new AuthResponse();
         response.setMessage("Login Successful");
+        response.setId(user.getId());
         response.setToken(token);
 
         return response;

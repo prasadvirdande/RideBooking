@@ -193,6 +193,7 @@ public class ServiceImpl implements UserService {
         );
 
         return new UserLoginResponseDTO(
+                user.getId().toString(),
                 user.getEmail(),
                 user.getPassword(),
                 user.getRole().name()

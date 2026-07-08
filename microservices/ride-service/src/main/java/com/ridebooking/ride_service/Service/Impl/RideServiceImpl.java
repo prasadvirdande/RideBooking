@@ -14,6 +14,7 @@ import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
 import java.time.Duration;
+import java.util.List;
 import java.util.Random;
 import java.util.UUID;
 
@@ -223,6 +224,40 @@ public class RideServiceImpl implements RideService {
                 "OTP verified for ride: "
                         + ride.getId()
         );
+    }
+
+    @Override
+    public SearchRideResponseDTO searchRide(SearchRideRequest request) {
+
+        List<DriverDTO> nearbyDrivers =
+                driverFeign.getNearbyDrivers(
+                        request.getPickupLatitude(),
+                        request.getPickupLongitude()
+                );
+
+        if (nearbyDrivers.isEmpty()) {
+            throw new RuntimeException("No nearby drivers found");
+        }
+
+        double distance = calculateDistance(
+                request.getPickupLatitude(),
+                request.getPickupLongitude(),
+                request.getDropLatitude(),
+                request.getDropLongitude()
+        );
+
+        double fare = calculateFare(distance);
+
+        int estimatedTime =
+                (int) Math.ceil((distance / 30.0) * 60);
+
+        return SearchRideResponseDTO.builder()
+                .estimatedDistance(distance)
+                .estimatedFare(fare)
+                .estimatedTime(estimatedTime)
+                .nearbyDrivers(nearbyDrivers)
+                .message("Nearby drivers found successfully")
+                .build();
     }
 
     private double calculateDistance(

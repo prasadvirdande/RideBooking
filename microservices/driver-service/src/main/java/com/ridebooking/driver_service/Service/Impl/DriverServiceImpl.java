@@ -89,22 +89,42 @@ public class DriverServiceImpl implements DriverService {
     }
 
     @Override
-    public GeoResults<RedisGeoCommands.GeoLocation<Object>>
-    findNearbyDrivers(
+    public List<DriverResponseDto> findNearbyDrivers(
             Double latitude,
             Double longitude) {
 
-        return redisTemplate.opsForGeo().radius(
-                "driver-location",
-                new Circle(
-                        new Point(longitude, latitude),
-                        new Distance(5, Metrics.KILOMETERS)
-                ),
-                RedisGeoCommands.GeoRadiusCommandArgs
-                        .newGeoRadiusArgs()
-                        .includeCoordinates()
-                        .includeDistance()
-        );
+        GeoResults<RedisGeoCommands.GeoLocation<Object>> results =
+                redisTemplate.opsForGeo().radius(
+                        "driver-location",
+                        new Circle(
+                                new Point(longitude, latitude),
+                                new Distance(5, Metrics.KILOMETERS)
+                        ),
+                        RedisGeoCommands.GeoRadiusCommandArgs
+                                .newGeoRadiusArgs()
+                                .includeCoordinates()
+                                .includeDistance()
+                );
+
+        if (results == null || results.getContent().isEmpty()) {
+            return List.of();
+        }
+
+        return results.getContent()
+                .stream()
+                .map(result -> {
+
+                    UUID driverId = UUID.fromString(
+                            result.getContent().getName().toString()
+                    );
+
+                    Driver driver = driverepo.findById(driverId)
+                            .orElseThrow(() ->
+                                    new RuntimeException("Driver not found"));
+
+                    return mapToDriverResponseDto(driver);
+                })
+                .toList();
     }
 
     @Override
@@ -137,8 +157,15 @@ public class DriverServiceImpl implements DriverService {
         ).orElseThrow(() -> new RuntimeException("Driver not found"));
 
 
+
         driver.setStatus(DriverStatus.BUSY);
         driverepo.save(driver);
+    }
+
+    @Override
+    public DriverResponseDto getDriverByEmail(String email) {
+        Driver driver = driverepo.findByEmail(email).orElseThrow(() -> new RuntimeException("Driver not found"));
+        return mapToDriverResponseDto(driver);
     }
 
 

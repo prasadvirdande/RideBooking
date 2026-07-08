@@ -13,4 +13,6 @@ public interface AuthService {
     void logout(String token);
 
     AuthResponse Driverregister(DriverRequest authRequest);
+
+    AuthResponse loginDriver(LoginRequest loginRequest);
 }

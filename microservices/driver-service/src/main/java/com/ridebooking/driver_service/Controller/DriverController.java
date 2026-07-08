@@ -26,6 +26,10 @@ public class DriverController {
     public ResponseEntity< DriverResponseDto> createDriver(@RequestBody DriverRequestDto driverRequestDto) {
         return ResponseEntity.ok(driverService.createDriver(driverRequestDto));
     }
+    @GetMapping("/email/{email}")
+    public ResponseEntity<DriverResponseDto> getDriverByEmail(@PathVariable String email) {
+        return ResponseEntity.ok(driverService.getDriverByEmail(email));
+    }
 
     @PostMapping("/login")
     public ResponseEntity<DriverLoginResponseDTO> loginDriver(@RequestBody DriverLoginRequestDto driverRequestDto) {

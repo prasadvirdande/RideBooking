@@ -40,6 +40,13 @@ public class AuthController {
                 .body(response);
     }
 
+    @PostMapping("/driver/login")
+    public ResponseEntity<AuthResponse> loginDriver( @RequestBody LoginRequest loginRequest){
+        AuthResponse response = authService.loginDriver(loginRequest);
+        return ResponseEntity
+                .status(HttpStatus.OK)
+                .body(response);
+    }
 
     @PostMapping("/login")
     public ResponseEntity<AuthResponse> loginUser(
