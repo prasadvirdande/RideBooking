@@ -9,6 +9,8 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class DriverLoginResponseDTO {
 
+
+    private String id;
     private String email;
     private String password;
     private String role;

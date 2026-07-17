@@ -33,7 +33,9 @@ public class SecurityConfig {
                                         "/api/ride",
                                         "/api/ride/search",
                                         "/api/ride/id/**",
-                                        "/api/ride/verify/otp"
+                                        "/api/ride/verify/otp",
+                                        "/api/ride/start",
+                                        "/api/ride/complete"
 
 
 

@@ -1,4 +1,4 @@
-package com.ridebooking.vehicle_service;
+package com.ridebooking.Payment_services;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;

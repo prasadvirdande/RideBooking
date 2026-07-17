@@ -1,6 +1,7 @@
 package com.ridebooking.driver_service.Service;
 
 import com.ridebooking.driver_service.DTO.RideAcceptedEvent;
+import com.ridebooking.driver_service.DTO.RideStartedEvent;
 import com.ridebooking.driver_service.Entity.Driver;
 import com.ridebooking.driver_service.Enum.DriverStatus;
 import com.ridebooking.driver_service.Repository.Driverepo;
@@ -24,10 +25,6 @@ public class RideAcceptedConsumer {
             RideAcceptedEvent event
     ) {
 
-        System.out.println(
-                "EVENT RECEIVED = "
-                        + event.getDriverId()
-        );
 
         Driver driver =
                 driverepo.findById(
@@ -43,4 +40,21 @@ public class RideAcceptedConsumer {
         driverepo.save(driver);
     }
 
-}
+    public void consume1(RideStartedEvent event1) {
+      System.out.println("Ride Started");
+        Driver driver =
+                driverepo.findById(
+                        UUID.fromString(
+                                event1.getDriverId()
+                        )
+                ).orElseThrow();
+
+        driver.setStatus(
+                DriverStatus.INPROGRESS
+        );
+
+        driverepo.save(driver);
+    }
+
+    }
+

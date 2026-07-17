@@ -52,7 +52,7 @@ public class DriverServiceImpl implements DriverService {
 
     private DriverResponseDto mapToDriverResponseDto(Driver driver) {
         return DriverResponseDto.builder().
-                id(driver.getId()).
+                id(UUID.fromString(driver.getId().toString())).
                 email(driver.getEmail()).
                 role(driver.getRole().name()).
                 DriverName(driver.getDriverName()).
@@ -135,6 +135,7 @@ public class DriverServiceImpl implements DriverService {
                 new RuntimeException("Driver not found"));
 
         return new DriverLoginResponseDTO(
+                driver.getId().toString(),
                 driver.getEmail(),
                 driver.getPassword(),
                 driver.getRole().name()

@@ -38,11 +38,22 @@ public class RideController {
 
     @PutMapping("/id/{rideId}")
     public ResponseEntity<AcceptedRideResponseDTO> updateRide(@PathVariable UUID rideId, @RequestBody AcceptRideRequest rideRequest) {
+        System.out.println("UPDATE RIDE API HIT");
         return ResponseEntity.ok(rideService.updateRide(rideId, rideRequest));
     }
     @PostMapping("/verify/otp")
     public ResponseEntity<?> verifyOtp(@RequestBody VerifyOtpDTO verifyOtpDTO) {
         rideService.verifyOtp(verifyOtpDTO);
         return ResponseEntity.ok("OTP verified successfully");
+    }
+    @PutMapping("/start")
+    public ResponseEntity<String> startRide(@RequestBody StartRideDTO startRideDTO){
+        rideService.startRide(startRideDTO);
+        return ResponseEntity.ok("Ride started");
+
+    }
+    @PostMapping("/complete")
+    public  ResponseEntity<CompleteRideResponseDTO> completeRide(@RequestBody  CompleteRideDTO completeRideDTO){
+        return ResponseEntity.ok(rideService.completeride(completeRideDTO));
     }
 }

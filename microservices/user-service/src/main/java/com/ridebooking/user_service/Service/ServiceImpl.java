@@ -8,6 +8,7 @@ import com.ridebooking.user_service.Feign.DriverClient;
 import com.ridebooking.user_service.Repository.UserRepo;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.bouncycastle.asn1.x509.Time;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -64,7 +65,15 @@ public class ServiceImpl implements UserService {
         user.setPhoneNumber(request.getPhone());
         user.setEmail(request.getEmail());
 
+
+        long start = System.currentTimeMillis();
+        System.out.println("Start time: " + start);
+        long end = System.currentTimeMillis();
+        System.out.println("End time: " + end);
         User updatedUser = userRepo.save(user);
+
+        long duration = end - start;
+        System.out.println("Duration: " + duration + "ms");
 
         log.info("User updated successfully: {}", updatedUser.getEmail());
 
@@ -152,6 +161,8 @@ public class ServiceImpl implements UserService {
         user.setDefaultAddress(
                 request.getDefaultAddress()
         );
+
+
 
         User savedUser =
                 userRepo.save(user);

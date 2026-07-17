@@ -2,6 +2,7 @@ package com.ridebooking.ride_service.Service.Impl;
 
 import com.ridebooking.ride_service.DTO.*;
 import com.ridebooking.ride_service.DTO.Event.RideAcceptedRideEvent;
+import com.ridebooking.ride_service.DTO.Event.RideStartedEvent;
 import com.ridebooking.ride_service.Entity.Ride;
 import com.ridebooking.ride_service.Enums.RideStatus;
 import com.ridebooking.ride_service.Feign.DriverFeign;
@@ -257,6 +258,108 @@ public class RideServiceImpl implements RideService {
                 .estimatedTime(estimatedTime)
                 .nearbyDrivers(nearbyDrivers)
                 .message("Nearby drivers found successfully")
+                .build();
+    }
+
+    @Override
+    public void startRide(StartRideDTO startRideDTO) {
+        Ride ride=rideRepository.findById(UUID.fromString(startRideDTO.getRideId())).orElseThrow(
+                ()-> new RuntimeException("No ride with id :" + startRideDTO.getRideId())
+        );
+        System.out.println("Driver from DB      : " + ride.getDriverId());
+        System.out.println("Driver from Request : " + startRideDTO.getDriverId());
+
+        if (!ride.getDriverId().toString().equals(startRideDTO.getDriverId())) {
+            throw new RuntimeException("Driver is not assigned to this ride.");
+        }
+
+        if (ride.getRideStatus() != RideStatus.ACCEPTED) {
+            throw new RuntimeException("OTP is not verified.");
+        }
+
+        ride.setRideStatus(RideStatus.INPROGRESS);
+
+        rideRepository.save(ride);
+
+        RideStartedEvent started= new RideStartedEvent(
+              ride.getDriverId().toString(),
+                ride.getId().toString()
+        );
+        rideProducer.starRide(started);
+
+
+
+    }
+
+    @Override
+    public CompleteRideResponseDTO completeride(
+            CompleteRideDTO completeRideDTO) {
+
+        Ride ride = rideRepository.findById(
+                UUID.fromString(
+                        completeRideDTO.getRideId()
+                )
+        ).orElseThrow(() ->
+                new RuntimeException("Ride not found")
+        );
+
+
+        if (ride.getRideStatus() != RideStatus.INPROGRESS) {
+
+            throw new RuntimeException(
+                    "Ride is not in progress."
+            );
+        }
+
+        ride.setDestinationLatitude(
+                completeRideDTO.getDropLatitude()
+        );
+
+        ride.setDestinationLongitude(
+                completeRideDTO.getDropLongitude()
+        );
+
+        double distance =
+                calculateDistance(
+                        ride.getPickupLatitude(),
+                        ride.getPickupLongitude(),
+                        completeRideDTO.getDropLatitude(),
+                        completeRideDTO.getDropLongitude()
+                );
+
+        double fare =
+                calculateFare(distance);
+
+        ride.setDistance(
+                BigDecimal.valueOf(distance)
+        );
+
+        ride.setFare(
+                BigDecimal.valueOf(fare)
+        );
+
+        ride.setRideStatus(
+                RideStatus.COMPLETED
+        );
+
+        Ride savedRide =
+                rideRepository.save(ride);
+
+        // Publish RideCompletedEvent here
+        // RideCompletedEvent event =
+        //         new RideCompletedEvent(
+        //                 savedRide.getDriverId().toString(),
+        //                 savedRide.getId().toString()
+        //         );
+        //
+        // rideProducer.completeRide(event);
+
+        return CompleteRideResponseDTO.builder()
+                .rideId(savedRide.getId().toString())
+                .distance(savedRide.getDistance().doubleValue())
+                .fare(savedRide.getFare().doubleValue())
+                .status(savedRide.getRideStatus().name())
+                .message("Ride completed successfully.")
                 .build();
     }
 

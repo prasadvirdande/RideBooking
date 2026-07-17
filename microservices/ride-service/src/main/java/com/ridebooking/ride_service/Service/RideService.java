@@ -14,4 +14,8 @@ public interface RideService {
 
 
     SearchRideResponseDTO searchRide(SearchRideRequest request);
+
+    void startRide(StartRideDTO startRideDTO);
+
+    CompleteRideResponseDTO completeride(CompleteRideDTO completeRideDTO);
 }
