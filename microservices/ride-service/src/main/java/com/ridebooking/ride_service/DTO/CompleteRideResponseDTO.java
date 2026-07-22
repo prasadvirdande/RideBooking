@@ -8,13 +8,6 @@ import lombok.Data;
 public class CompleteRideResponseDTO {
     private String rideId;
 
-//    private String userId;
-//
-//    private String driverId;
-//
-//    private Double pickupLatitude;
-//
-//    private Double pickupLongitude;
 
     private Double destinationLatitude;
 
@@ -23,6 +16,8 @@ public class CompleteRideResponseDTO {
     private Double distance;
 
     private Double fare;
+
+    private PaymentResponseDTO payment;
 
     private String status;
 

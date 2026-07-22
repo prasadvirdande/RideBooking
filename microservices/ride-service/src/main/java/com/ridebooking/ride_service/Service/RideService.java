@@ -18,4 +18,6 @@ public interface RideService {
     void startRide(StartRideDTO startRideDTO);
 
     CompleteRideResponseDTO completeride(CompleteRideDTO completeRideDTO);
+
+    void completeRideAfterPayment(UUID rideId);
 }

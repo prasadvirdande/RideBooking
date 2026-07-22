@@ -6,10 +6,12 @@ import com.ridebooking.ride_service.DTO.Event.RideStartedEvent;
 import com.ridebooking.ride_service.Entity.Ride;
 import com.ridebooking.ride_service.Enums.RideStatus;
 import com.ridebooking.ride_service.Feign.DriverFeign;
+import com.ridebooking.ride_service.Feign.PaymentClient;
 import com.ridebooking.ride_service.Feign.UserFeign;
 import com.ridebooking.ride_service.Repository.RideRepo;
 import com.ridebooking.ride_service.Service.Kafka.RideProducer;
 import com.ridebooking.ride_service.Service.RideService;
+import jakarta.transaction.Transactional;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
@@ -27,13 +29,15 @@ public class RideServiceImpl implements RideService {
     private final DriverFeign driverFeign;
     private final RideProducer rideProducer;
     private final RedisTemplate<String, String> redisTemplate;
+    private final PaymentClient paymentClient;
 
-    public RideServiceImpl(RideRepo rideRepository, UserFeign userFeign, DriverFeign driverFeign, RideProducer rideProducer, RedisTemplate<String, String> redisTemplate) {
+    public RideServiceImpl(RideRepo rideRepository, UserFeign userFeign, DriverFeign driverFeign, RideProducer rideProducer, RedisTemplate<String, String> redisTemplate, PaymentClient paymentClient) {
         this.rideRepository = rideRepository;
         this.userFeign = userFeign;
         this.driverFeign = driverFeign;
         this.rideProducer = rideProducer;
         this.redisTemplate = redisTemplate;
+        this.paymentClient = paymentClient;
     }
 
     @Override
@@ -262,105 +266,176 @@ public class RideServiceImpl implements RideService {
     }
 
     @Override
+    @Transactional
     public void startRide(StartRideDTO startRideDTO) {
-        Ride ride=rideRepository.findById(UUID.fromString(startRideDTO.getRideId())).orElseThrow(
-                ()-> new RuntimeException("No ride with id :" + startRideDTO.getRideId())
-        );
-        System.out.println("Driver from DB      : " + ride.getDriverId());
-        System.out.println("Driver from Request : " + startRideDTO.getDriverId());
+
+        Ride ride = rideRepository.findById(
+                UUID.fromString(startRideDTO.getRideId())
+        ).orElseThrow(() ->
+                new RuntimeException("Ride not found"));
+
+        System.out.println("========== START RIDE ==========");
+        System.out.println("Ride ID      : " + ride.getId());
+        System.out.println("DB Status    : " + ride.getRideStatus());
+        System.out.println("Driver(DB)   : " + ride.getDriverId());
+        System.out.println("Driver(REQ)  : " + startRideDTO.getDriverId());
 
         if (!ride.getDriverId().toString().equals(startRideDTO.getDriverId())) {
             throw new RuntimeException("Driver is not assigned to this ride.");
         }
 
+        if (ride.getRideStatus() == RideStatus.COMPLETED) {
+            throw new RuntimeException("Ride is already completed.");
+        }
+
+        if (ride.getRideStatus() == RideStatus.INPROGRESS) {
+            System.out.println("Ride already started.");
+            return;
+        }
+
         if (ride.getRideStatus() != RideStatus.ACCEPTED) {
-            throw new RuntimeException("OTP is not verified.");
+            throw new RuntimeException("Ride must be ACCEPTED before starting.");
         }
 
         ride.setRideStatus(RideStatus.INPROGRESS);
 
-        rideRepository.save(ride);
+        Ride savedRide = rideRepository.save(ride);
 
-        RideStartedEvent started= new RideStartedEvent(
-              ride.getDriverId().toString(),
-                ride.getId().toString()
+        System.out.println("Status after save : " + savedRide.getRideStatus());
+
+        RideStartedEvent event = new RideStartedEvent(
+                savedRide.getDriverId().toString(),
+                savedRide.getId().toString()
         );
-        rideProducer.starRide(started);
 
+        rideProducer.starRide(event);
 
-
+        System.out.println("========== START END ==========");
     }
 
     @Override
-    public CompleteRideResponseDTO completeride(
-            CompleteRideDTO completeRideDTO) {
+    @Transactional
+    public CompleteRideResponseDTO completeride(CompleteRideDTO completeRideDTO) {
 
         Ride ride = rideRepository.findById(
-                UUID.fromString(
-                        completeRideDTO.getRideId()
-                )
-        ).orElseThrow(() ->
-                new RuntimeException("Ride not found")
-        );
+                UUID.fromString(completeRideDTO.getRideId())
+        ).orElseThrow(() -> new RuntimeException("Ride not found"));
 
+        // Already waiting for payment
+        if (ride.getRideStatus() == RideStatus.PAYMENT_PENDING) {
 
+            // Fetch existing payment instead of creating a new one
+            PaymentResponseDTO paymentResponse =
+                    paymentClient.getPaymentByRideId(ride.getId());
+
+            return CompleteRideResponseDTO.builder()
+                    .rideId(ride.getId().toString())
+                    .distance(ride.getDistance().doubleValue())
+                    .fare(ride.getFare().doubleValue())
+                    .status(ride.getRideStatus().name())
+                    .payment(paymentResponse)
+                    .message("Ride has already ended. Waiting for payment.")
+                    .build();
+        }
+
+        // Already completed
+        if (ride.getRideStatus() == RideStatus.COMPLETED) {
+
+            return CompleteRideResponseDTO.builder()
+                    .rideId(ride.getId().toString())
+                    .distance(ride.getDistance().doubleValue())
+                    .fare(ride.getFare().doubleValue())
+                    .status(ride.getRideStatus().name())
+                    .message("Ride is already completed.")
+                    .build();
+        }
+
+        // Ride must be running
         if (ride.getRideStatus() != RideStatus.INPROGRESS) {
-
             throw new RuntimeException(
-                    "Ride is not in progress."
+                    "Ride must be INPROGRESS before ending."
             );
         }
 
-        ride.setDestinationLatitude(
-                completeRideDTO.getDropLatitude()
-        );
+        // ---------------- DEBUG ----------------
 
-        ride.setDestinationLongitude(
+        System.out.println("========== COMPLETE RIDE ==========");
+        System.out.println("Pickup Latitude  : " + ride.getPickupLatitude());
+        System.out.println("Pickup Longitude : " + ride.getPickupLongitude());
+        System.out.println("Drop Latitude    : " + completeRideDTO.getDropLatitude());
+        System.out.println("Drop Longitude   : " + completeRideDTO.getDropLongitude());
+
+        // ---------------------------------------
+
+        ride.setDestinationLatitude(completeRideDTO.getDropLatitude());
+        ride.setDestinationLongitude(completeRideDTO.getDropLongitude());
+
+        double distance = calculateDistance(
+                ride.getPickupLatitude(),
+                ride.getPickupLongitude(),
+                completeRideDTO.getDropLatitude(),
                 completeRideDTO.getDropLongitude()
         );
 
-        double distance =
-                calculateDistance(
-                        ride.getPickupLatitude(),
-                        ride.getPickupLongitude(),
-                        completeRideDTO.getDropLatitude(),
-                        completeRideDTO.getDropLongitude()
-                );
+        double fare = calculateFare(distance);
 
-        double fare =
-                calculateFare(distance);
+        ride.setDistance(BigDecimal.valueOf(distance));
+        ride.setFare(BigDecimal.valueOf(fare));
 
-        ride.setDistance(
-                BigDecimal.valueOf(distance)
-        );
+        // Wait for payment
+        ride.setRideStatus(RideStatus.PAYMENT_PENDING);
 
-        ride.setFare(
-                BigDecimal.valueOf(fare)
-        );
+        Ride savedRide = rideRepository.save(ride);
 
-        ride.setRideStatus(
-                RideStatus.COMPLETED
-        );
+        PaymentRequestDTO paymentRequest = PaymentRequestDTO.builder()
+                .rideId(savedRide.getId())
+                .userId(savedRide.getUserId())
+                .driverId(savedRide.getDriverId())
+                .amount(savedRide.getFare())
+                .build();
 
-        Ride savedRide =
-                rideRepository.save(ride);
+        PaymentResponseDTO paymentResponse =
+                paymentClient.createPayment(paymentRequest);
 
-        // Publish RideCompletedEvent here
-        // RideCompletedEvent event =
-        //         new RideCompletedEvent(
-        //                 savedRide.getDriverId().toString(),
-        //                 savedRide.getId().toString()
-        //         );
-        //
-        // rideProducer.completeRide(event);
+        if (paymentResponse == null ||
+                paymentResponse.getPaymentLink() == null) {
+
+            ride.setRideStatus(RideStatus.INPROGRESS);
+            rideRepository.save(ride);
+
+            throw new RuntimeException("Unable to generate payment link.");
+        }
 
         return CompleteRideResponseDTO.builder()
                 .rideId(savedRide.getId().toString())
                 .distance(savedRide.getDistance().doubleValue())
                 .fare(savedRide.getFare().doubleValue())
                 .status(savedRide.getRideStatus().name())
-                .message("Ride completed successfully.")
+                .payment(paymentResponse)
+                .message("Ride ended successfully. Please complete the payment.")
                 .build();
+    }
+
+    @Override
+    @Transactional
+    public void completeRideAfterPayment(UUID rideId) {
+
+        Ride ride = rideRepository.findById(rideId)
+                .orElseThrow(() -> new RuntimeException("Ride not found"));
+
+        if (ride.getRideStatus() == RideStatus.COMPLETED) {
+            return;
+        }
+
+        if (ride.getRideStatus() != RideStatus.PAYMENT_PENDING) {
+            throw new RuntimeException("Ride is not waiting for payment.");
+        }
+
+        ride.setRideStatus(RideStatus.COMPLETED);
+
+        rideRepository.save(ride);
+
+        System.out.println("Ride completed successfully : " + ride.getId());
     }
 
     private double calculateDistance(

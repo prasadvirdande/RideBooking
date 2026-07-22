@@ -38,7 +38,7 @@ public class UserSecurity {
                                "/api/users/login",
                                "/api/users/email/{email}" ,
                                 "api/driver/nearby",
-                                "api/users/id/{userId}"
+                                "api/users/id/**"
 
                         ).permitAll()
 

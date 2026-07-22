@@ -56,4 +56,15 @@ public class RideController {
     public  ResponseEntity<CompleteRideResponseDTO> completeRide(@RequestBody  CompleteRideDTO completeRideDTO){
         return ResponseEntity.ok(rideService.completeride(completeRideDTO));
     }
+    @PutMapping("/payment-success/{rideId}")
+    public ResponseEntity<String> paymentSuccess(
+            @PathVariable UUID rideId) {
+
+        System.out.println("PAYMENT SUCCESS API HIT   ");
+
+       rideService.completeRideAfterPayment(rideId);
+
+
+        return ResponseEntity.ok("SUCCESSSSSSSSS");
+    }
 }
