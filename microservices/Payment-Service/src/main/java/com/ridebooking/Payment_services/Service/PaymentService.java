@@ -4,6 +4,7 @@ import com.razorpay.PaymentLink;
 import com.razorpay.RazorpayClient;
 import com.razorpay.RazorpayException;
 import com.razorpay.Utils;
+import com.ridebooking.Payment_services.DTO.PaymentReceiptRequest;
 import com.ridebooking.Payment_services.DTO.PaymentRequestDTO;
 import com.ridebooking.Payment_services.DTO.PaymentResponseDTO;
 import com.ridebooking.Payment_services.DTO.UserResponseDto;
@@ -11,6 +12,7 @@ import com.ridebooking.Payment_services.Entity.Enums.PaymentMethods;
 import com.ridebooking.Payment_services.Entity.Enums.PaymentStatus;
 import com.ridebooking.Payment_services.Entity.Payment;
 import com.ridebooking.Payment_services.FeignCLient.Feign;
+import com.ridebooking.Payment_services.FeignCLient.NotificationFeign;
 import com.ridebooking.Payment_services.FeignCLient.RideClient;
 import com.ridebooking.Payment_services.Repository.PaymentRepo;
 import jakarta.transaction.Transactional;
@@ -29,6 +31,7 @@ public class PaymentService implements PaymentServiceINter {
     private final PaymentRepo paymentRepo;
     private final Feign feign;
     private final RideClient rideClient;
+    private final NotificationFeign notificationFeign;
 
     @Value("${razorpay.key.id}")
     private String keyId;
@@ -41,10 +44,11 @@ public class PaymentService implements PaymentServiceINter {
 
     public PaymentService(PaymentRepo paymentRepo,
                           Feign feign,
-                          RideClient rideClient) {
+                          RideClient rideClient, NotificationFeign notificationFeign) {
         this.paymentRepo = paymentRepo;
         this.feign = feign;
         this.rideClient = rideClient;
+        this.notificationFeign = notificationFeign;
     }
 
     @Override
@@ -239,7 +243,7 @@ public class PaymentService implements PaymentServiceINter {
                     .findByGatewayOrderId(paymentLinkId)
                     .orElseThrow(() ->
                             new RuntimeException("Payment not found : " + paymentLinkId));
-            // Ignore duplicate webhook deliverie+++
+            // Ignore duplicate webhook deliverie
             if (payment.getPaymentStatus() == PaymentStatus.SUCCESS) {
                 System.out.println("Payment already processed.");
                 return;
@@ -260,6 +264,17 @@ public class PaymentService implements PaymentServiceINter {
 
             // Notify Ride Service
             rideClient.paymentSuccess(payment.getRideId());
+
+            UserResponseDto user = feign.getUserById(payment.getUserId());
+
+            notificationFeign.sendPaymentReceipt(
+                    PaymentReceiptRequest.builder()
+                            .email(user.getEmail())
+                            .rideId(payment.getRideId().toString())
+                            .paymentId(payment.getGatewayPaymentId())
+                            .amount(payment.getAmount())
+                            .build()
+            );
 
             System.out.println("Payment successful for Ride : "
                     + payment.getRideId());

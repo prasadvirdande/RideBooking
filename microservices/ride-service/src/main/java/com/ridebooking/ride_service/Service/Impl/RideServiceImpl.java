@@ -376,9 +376,11 @@ public class RideServiceImpl implements RideService {
                 completeRideDTO.getDropLatitude(),
                 completeRideDTO.getDropLongitude()
         );
+        System.out.println("Distance : " + distance);
 
         double fare = calculateFare(distance);
 
+        System.out.println("Fare : " + fare);
         ride.setDistance(BigDecimal.valueOf(distance));
         ride.setFare(BigDecimal.valueOf(fare));
 
