@@ -9,4 +9,5 @@ public enum DriverStatus {
     INPROGRESS,
     COMPLETED,
     CANCELLED,
+    AVAILABLE
 }

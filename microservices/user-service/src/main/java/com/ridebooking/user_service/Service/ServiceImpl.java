@@ -6,12 +6,15 @@ import com.ridebooking.user_service.Entity.User;
 
 import com.ridebooking.user_service.Feign.DriverClient;
 import com.ridebooking.user_service.Repository.UserRepo;
+import com.ridebooking.user_service.sharding.ShardContext;
+import com.ridebooking.user_service.sharding.ShardResolver;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.bouncycastle.asn1.x509.Time;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -162,10 +165,15 @@ public class ServiceImpl implements UserService {
                 request.getDefaultAddress()
         );
 
+        String shard = ShardResolver.getShard(user.getEmail());
+
+        ShardContext.setShard(shard);
 
 
         User savedUser =
                 userRepo.save(user);
+
+        ShardContext.clear();
 
         return mapToDto(savedUser);
     }
@@ -179,35 +187,61 @@ public class ServiceImpl implements UserService {
     }
 
     @Override
-    public UserLoginResponseDTO loginUser(
-            UserLoginRequestDTO userLoginDTO) {
+    public UserLoginResponseDTO loginUser(UserLoginRequestDTO userLoginDTO) {
 
-        long start = System.currentTimeMillis();
+        long totalStart = System.nanoTime();
 
-        long dbStart = System.currentTimeMillis();
+        // Repository timing
+        long repoStart = System.nanoTime();
 
-        User user = userRepo.findByEmail(
-                userLoginDTO.getEmail()
-        ).orElseThrow(() ->
-                new RuntimeException("User not found!"));
+        String shard = ShardResolver.getShard(userLoginDTO.getEmail());
 
-        System.out.println(
-                "DB QUERY = "
-                        + (System.currentTimeMillis() - dbStart)
-                        + " ms"
+        ShardContext.setShard(shard);
+
+        Optional<User> optionalUser =
+                userRepo.findByEmail(userLoginDTO.getEmail());
+
+        ShardContext.clear();
+
+        long repoEnd = System.nanoTime();
+
+        System.out.println("Repository = "
+                + ((repoEnd - repoStart) / 1_000_000.0)
+                + " ms");
+
+        // orElseThrow timing
+        long orElseStart = System.nanoTime();
+
+        User user = optionalUser.orElseThrow(
+                () -> new RuntimeException("User not found!")
         );
 
-        System.out.println(
-                "TOTAL SERVICE = "
-                        + (System.currentTimeMillis() - start)
-                        + " ms"
-        );
+        long orElseEnd = System.nanoTime();
 
-        return new UserLoginResponseDTO(
+        System.out.println("orElseThrow = "
+                + ((orElseEnd - orElseStart) / 1_000_000.0)
+                + " ms");
+
+        // DTO creation timing
+        long dtoStart = System.nanoTime();
+
+        UserLoginResponseDTO response = new UserLoginResponseDTO(
                 user.getId().toString(),
                 user.getEmail(),
                 user.getPassword(),
                 user.getRole().name()
         );
+
+        long dtoEnd = System.nanoTime();
+
+        System.out.println("DTO Creation = "
+                + ((dtoEnd - dtoStart) / 1_000_000.0)
+                + " ms");
+
+        System.out.println("TOTAL SERVICE = "
+                + ((dtoEnd - totalStart) / 1_000_000.0)
+                + " ms");
+
+        return response;
     }
 }

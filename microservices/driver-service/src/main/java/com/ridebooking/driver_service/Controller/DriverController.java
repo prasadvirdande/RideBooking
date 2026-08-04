@@ -8,6 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.UUID;
 
 @RestController
 @AllArgsConstructor
@@ -35,14 +36,18 @@ public class DriverController {
     public ResponseEntity<DriverLoginResponseDTO> loginDriver(@RequestBody DriverLoginRequestDto driverRequestDto) {
         return ResponseEntity.ok(driverService.loginDriver(driverRequestDto));
     }
-    @GetMapping("/id/{driverId}")
-    public ResponseEntity<DriverResponseDto> getDriverById(@PathVariable String driverId) {
-        return ResponseEntity.ok(driverService.getDriverById(driverId));
-    }
+//    @GetMapping("/id/{driverId}")
+//    public ResponseEntity<DriverResponseDto> getDriverById(@PathVariable String driverId) {
+//        return ResponseEntity.ok(driverService.getDriverById(driverId));
+//    }
 
     @PutMapping("/location")
     public ResponseEntity<DriverLocationResponseDto> updateDriverLocation(@RequestBody DriverLocationUpdateDto driverLocationUpdateDto) {
         return ResponseEntity.ok(driverService.updateDriverLocation(driverLocationUpdateDto));
+    }
+    @GetMapping("/id/{id}")
+    public ResponseEntity<DriverResponseDto> getDriverById(@PathVariable UUID id) {
+        return ResponseEntity.ok(driverService.findById(id));
     }
 
     @GetMapping("/nearby")

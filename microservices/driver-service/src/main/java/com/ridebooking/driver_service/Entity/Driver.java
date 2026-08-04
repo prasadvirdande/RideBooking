@@ -12,6 +12,7 @@ import java.util.UUID;
 @Entity
 @Table(name = "drivers")
 @Data
+
 public class Driver {
 
     @Id
@@ -23,7 +24,6 @@ public class Driver {
    private String email;
 
    private String password;
-
 
 
     private String licenseNumber;

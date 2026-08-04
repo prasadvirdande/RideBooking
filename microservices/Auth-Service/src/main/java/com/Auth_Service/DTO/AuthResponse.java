@@ -5,7 +5,7 @@ import lombok.NoArgsConstructor;
 
 @Data
 @NoArgsConstructor
-public class    AuthResponse {
+public class  AuthResponse {
 
     private String message;
     private String id;

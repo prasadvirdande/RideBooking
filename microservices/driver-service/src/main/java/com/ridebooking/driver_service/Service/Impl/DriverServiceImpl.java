@@ -4,8 +4,10 @@ import com.ridebooking.driver_service.DTO.*;
 import com.ridebooking.driver_service.Entity.Driver;
 import com.ridebooking.driver_service.Enum.DriverStatus;
 import com.ridebooking.driver_service.Enum.Role;
+import com.ridebooking.driver_service.Exception.DriverNotFound;
 import com.ridebooking.driver_service.Repository.Driverepo;
 import com.ridebooking.driver_service.Service.DriverService;
+import jakarta.transaction.Transactional;
 import lombok.AllArgsConstructor;
 
 import org.springframework.data.geo.*;
@@ -63,6 +65,7 @@ public class DriverServiceImpl implements DriverService {
     }
 
     @Override
+    @Transactional
     public DriverLocationResponseDto updateDriverLocation(DriverLocationUpdateDto driverLocationUpdateDto) {
         Driver driver = driverepo.findById(driverLocationUpdateDto.getDriverId()).orElseThrow(() -> new RuntimeException("Driver not found"));
         System.out.println(
@@ -79,6 +82,7 @@ public class DriverServiceImpl implements DriverService {
                 driverLocationUpdateDto.getDriverId().toString()
         );
         driver.setOnline(true);
+        driver.setStatus(DriverStatus.AVAILABLE);
         driverepo.save(driver);
         return DriverLocationResponseDto.builder()
                 .driverId(driverLocationUpdateDto.getDriverId())
@@ -113,17 +117,13 @@ public class DriverServiceImpl implements DriverService {
         return results.getContent()
                 .stream()
                 .map(result -> {
+                    UUID driverId = UUID.fromString(result.getContent().getName().toString());
 
-                    UUID driverId = UUID.fromString(
-                            result.getContent().getName().toString()
-                    );
-
-                    Driver driver = driverepo.findById(driverId)
-                            .orElseThrow(() ->
-                                    new RuntimeException("Driver not found"));
-
-                    return mapToDriverResponseDto(driver);
+                    return driverepo.findById(driverId)
+                            .orElseThrow(() -> new RuntimeException("Driver not found"));
                 })
+                .filter(driver -> driver.getStatus() == DriverStatus.AVAILABLE)
+                .map(this::mapToDriverResponseDto)
                 .toList();
     }
 
@@ -133,6 +133,8 @@ public class DriverServiceImpl implements DriverService {
                 driverRequestDto.getEmail()
         ).orElseThrow(() ->
                 new RuntimeException("Driver not found"));
+
+        System.out.println("Driver fetched from DB = " + driver.getId().toString());
 
         return new DriverLoginResponseDTO(
                 driver.getId().toString(),
@@ -149,13 +151,14 @@ public class DriverServiceImpl implements DriverService {
     }
 
     @Override
+    @Transactional
     public void acceptRide(AcceptRideRequest driverId) {
 
         System.out.println("Driver ID received: " + driverId);
 
-        Driver driver = driverepo.findById(
+        Driver driver = driverepo.findByIdForUpdate(
                 UUID.fromString(driverId.getDriverId())
-        ).orElseThrow(() -> new RuntimeException("Driver not found"));
+        ).orElseThrow(() -> new DriverNotFound("Driver not found"));
 
 
 
@@ -165,7 +168,14 @@ public class DriverServiceImpl implements DriverService {
 
     @Override
     public DriverResponseDto getDriverByEmail(String email) {
-        Driver driver = driverepo.findByEmail(email).orElseThrow(() -> new RuntimeException("Driver not found"));
+        Driver driver = driverepo.findByEmail(email).orElseThrow(() -> new DriverNotFound("Driver not found"));
+        return mapToDriverResponseDto(driver);
+    }
+
+    @Override
+    @Transactional
+    public DriverResponseDto findById(UUID id) {
+        Driver driver = driverepo.findById(id).orElseThrow(() -> new DriverNotFound("Driver not found"));
         return mapToDriverResponseDto(driver);
     }
 

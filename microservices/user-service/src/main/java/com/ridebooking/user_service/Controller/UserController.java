@@ -59,8 +59,20 @@ public class UserController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<UserLoginResponseDTO> loginUser(@RequestBody UserLoginRequestDTO userLoginDTO){
-        UserLoginResponseDTO response = userService.loginUser(userLoginDTO);
+    public ResponseEntity<UserLoginResponseDTO> login(
+            @RequestBody UserLoginRequestDTO dto) {
+
+        System.out.println("ENTER CONTROLLER " + System.currentTimeMillis());
+
+        long start = System.nanoTime();
+
+        UserLoginResponseDTO response = userService.loginUser(dto);
+
+        System.out.println("EXIT CONTROLLER " + System.currentTimeMillis());
+
+        System.out.println("CONTROLLER = "
+                + ((System.nanoTime() - start) / 1_000_000.0));
+
         return ResponseEntity.ok(response);
     }
 

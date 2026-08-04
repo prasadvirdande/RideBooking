@@ -2,6 +2,8 @@
 package com.Auth_Service.Service.Impl;
 
 import com.Auth_Service.DTO.*;
+import com.Auth_Service.ExceptionHandling.InvalidCredentialsException;
+import com.Auth_Service.ExceptionHandling.Usernotfound;
 import com.Auth_Service.Feign.DriverClient;
 import com.Auth_Service.Feign.UserClient;
 import com.Auth_Service.Security.AuthUserDetailsService;
@@ -64,7 +66,7 @@ public class AuthserviceImpl implements AuthService {
         UserDto user = driverClient.createDriver(driverRequest);
 
         if (user == null) {
-            throw new RuntimeException("Driver registration failed");
+            throw new Usernotfound("Driver registration failed");
         }
 
         String token = jwtservice.generateToken(
@@ -83,8 +85,9 @@ public class AuthserviceImpl implements AuthService {
     public AuthResponse loginDriver(LoginRequest loginRequest) {
         UserDto driver = driverClient.loginDriver(loginRequest);
         boolean valid=passwordEncoder.matches(loginRequest.getPassword(),driver.getPassword());
-        if(!valid)throw new RuntimeException("Invalid credentials For Driver");
+        if(!valid)throw new InvalidCredentialsException("Invalid credentials For Driver");
         AuthResponse response = new AuthResponse();
+        response.setId(driver.getId());
         response.setMessage("Login Successful");
         response.setToken(jwtservice.generateToken(driver.getEmail(), Set.of(driver.getRole())));
         return response;
@@ -96,7 +99,11 @@ public class AuthserviceImpl implements AuthService {
         long start = System.currentTimeMillis();
 
         long t1 = System.currentTimeMillis();
+        System.out.println("Before Feign = " + System.currentTimeMillis());
+
         UserDto user = userClient.loginUser(request);
+
+        System.out.println("After Feign = " + System.currentTimeMillis());
         System.out.println("User Service Call = "
                 + (System.currentTimeMillis() - t1) + " ms");
 
@@ -109,7 +116,7 @@ public class AuthserviceImpl implements AuthService {
                 + (System.currentTimeMillis() - t2) + " ms");
 
         if (!valid) {
-            throw new RuntimeException("Invalid credentials");
+            throw new InvalidCredentialsException("Invalid credentials");
         }
 
         long t3 = System.currentTimeMillis();
@@ -130,85 +137,7 @@ public class AuthserviceImpl implements AuthService {
 
         return response;
     }
-//    @Override
-//    public AuthResponse login(LoginRequest request) {
-//
-//        UserDto account = null;
-//
-//
-//        try {
-//            account = userClient.loginUser(
-//                    request
-//            );
-//        } catch (Exception ignored) {
-//        }
-//
-//        if (account == null) {
-//            try {
-//                account = driverClient.loginDriver(request);
-//            } catch (Exception ignored) {
-//            }
-//        }
-//
-//        if (account == null) {
-//            throw new RuntimeException("Account not found");
-//        }
-//        System.out.println("================================");
-//        System.out.println("Email: " + account.getEmail());
-//        System.out.println("Raw Password: " + request.getPassword());
-//        System.out.println("Stored Password: " + account.getPassword());
-//        System.out.println("================================");
-//
-//        if (!passwordEncoder.matches(
-//                request.getPassword(),
-//                account.getPassword()
-//        )) {
-//            throw new RuntimeException("Invalid credentials");
-//        }
-//
-//        String token = jwtservice.generateToken(
-//                account.getEmail(),
-//                Set.of(account.getRole())
-//        );
-//
-//        AuthResponse response = new AuthResponse();
-//        response.setMessage("Login Successful");
-//        response.setToken(token);
-//
-//        return response;
-//    }
 
-//    @Override
-//    public AuthResponse login(LoginRequest request) {
-//
-//        System.out.println("LOGIN SERVICE HIT");
-//
-//        authenticationManager.authenticate(
-//                new UsernamePasswordAuthenticationToken(
-//                        request.getEmail(),
-//                        request.getPassword()
-//                )
-//        );
-//
-//        UserDetails userDetails =
-//                authUserDetailsService.loadUserByUsername(
-//                        request.getEmail()
-//                );
-//
-//        String token = jwtservice.generateToken(
-//                userDetails.getUsername(),
-//                userDetails.getAuthorities()
-//                        .stream()
-//                        .map(GrantedAuthority::getAuthority)
-//                        .collect(Collectors.toSet())
-//        );
-//
-//        AuthResponse response = new AuthResponse();
-//        response.setMessage("Login Successful");
-//        response.setToken(token);
-//
-//        return response;
-//    }
     @Override
     public void logout(String token) {
         System.out.println("Logout Successful");

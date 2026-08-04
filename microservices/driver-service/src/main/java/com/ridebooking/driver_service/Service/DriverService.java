@@ -4,6 +4,7 @@ import com.ridebooking.driver_service.DTO.*;
 import org.springframework.data.geo.GeoResults;
 
 import java.util.List;
+import java.util.UUID;
 
 public interface DriverService {
     List<DriverResponseDto> getAllDrivers();
@@ -23,4 +24,6 @@ public interface DriverService {
     void acceptRide(AcceptRideRequest driverId);
 
     DriverResponseDto getDriverByEmail(String email);
+
+    DriverResponseDto findById(UUID id);
 }

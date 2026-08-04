@@ -2,6 +2,7 @@ package com.ridebooking.user_service.Repository;
 
 import com.ridebooking.user_service.Entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -11,7 +12,9 @@ import java.util.UUID;
 @Repository
 public interface UserRepo extends JpaRepository<User, UUID> {
 
+   @Query(value = "select * from users where email=:email",nativeQuery = true)
    Optional<User>   findByEmail(String email);
+
    List<User> findByFirstNameContainingIgnoreCase(String keyword);
 
 

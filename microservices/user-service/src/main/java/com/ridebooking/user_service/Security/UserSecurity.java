@@ -37,8 +37,8 @@ public class UserSecurity {
                                "/api/users/register",
                                "/api/users/login",
                                "/api/users/email/{email}" ,
-                                "api/driver/nearby",
-                                "api/users/id/**"
+                                "/api/driver/nearby",
+                                "/api/users/id/**"
 
                         ).permitAll()
 
