@@ -1,207 +1,288 @@
-# RideBooking
-# 🚕 Ride Booking System
+# 🚕 Ride Booking Application
 
-A **production-oriented ride booking backend** built using **Java, Spring Boot, Spring Cloud, PostgreSQL, Redis, Kafka, and Razorpay**.
+A **microservices-based Ride Booking Application** built using **Java, Spring Boot, Spring Cloud, PostgreSQL, Redis, Kafka, JWT, and Razorpay**.
 
-The application follows a **microservices architecture** where authentication, users, drivers, rides, payments, and notifications are separated into independently deployable services.
-
-The system is designed to handle important real-world ride-booking concerns such as **driver location tracking, ride assignment, concurrent ride acceptance, authentication, payment processing, payment webhooks, and asynchronous communication**.
+The application is designed to handle the complete ride lifecycle, from user authentication and driver location tracking to ride booking, driver acceptance, OTP-based ride start, ride completion, and online payment processing.
 
 ---
 
 ## 🏗️ Architecture
 
-```text
-                         ┌──────────────────┐
-                         │     Frontend     │
-                         └────────┬─────────┘
-                                  │
-                                  ▼
-                         ┌──────────────────┐
-                         │    API Gateway   │
-                         └────────┬─────────┘
-                                  │
-             ┌────────────────────┼────────────────────┐
-             │                    │                    │
-             ▼                    ▼                    ▼
-      ┌─────────────┐      ┌─────────────┐      ┌─────────────┐
-      │ Auth Service│      │ User Service│      │Driver Service│
-      └─────────────┘      └─────────────┘      └──────┬──────┘
-                                                        │
-                                                        ▼
-                                                  ┌───────────┐
-                                                  │   Redis   │
-                                                  │ Geo Index │
-                                                  └───────────┘
+The application is divided into multiple independent microservices.
 
-                         ┌──────────────────┐
-                         │   Ride Service   │
-                         └────────┬─────────┘
-                                  │
-                    ┌─────────────┼──────────────┐
-                    │             │              │
-                    ▼             ▼              ▼
-              ┌──────────┐ ┌────────────┐ ┌──────────────┐
-              │ Payment  │ │   Kafka    │ │ Notification │
-              │ Service  │ │            │ │   Service    │
-              └────┬─────┘ └────────────┘ └──────────────┘
-                   │
-                   ▼
-             ┌────────────┐
-             │  Razorpay  │
-             └────────────┘
+```text
+                        ┌─────────────────┐
+                        │      Client     │
+                        └────────┬────────┘
+                                 │
+                                 ▼
+                        ┌─────────────────┐
+                        │   API Gateway   │
+                        └────────┬────────┘
+                                 │
+             ┌───────────────────┼───────────────────┐
+             │                   │                   │
+             ▼                   ▼                   ▼
+      ┌─────────────┐     ┌─────────────┐     ┌──────────────┐
+      │Auth Service │     │User Service │     │Driver Service│
+      └─────────────┘     └─────────────┘     └──────┬───────┘
+                                                      │
+                                                      ▼
+                                                ┌───────────┐
+                                                │   Redis   │
+                                                │ GEO Index │
+                                                └───────────┘
+
+                         ┌────────────────┐
+                         │  Ride Service  │
+                         └───────┬────────┘
+                                 │
+                                 ▼
+                         ┌────────────────┐
+                         │ Payment Service│
+                         └───────┬────────┘
+                                 │
+                                 ▼
+                           ┌──────────┐
+                           │ Razorpay │
+                           └──────────┘
+
+                         ┌────────────────┐
+                         │     Kafka      │
+                         └────────────────┘
 ```
 
 ---
 
-## 🚀 Main Features
+# 📦 Microservices
 
-### 🔐 Authentication & Authorization
+The project currently contains the following services:
 
-* User and driver authentication
-* JWT-based authentication
-* Access-token based API authorization
-* Spring Security integration
-* Role-based access control
-* Authentication handled independently through the Auth Service
+```text
+Auth Service
+User Service
+Driver Service
+Ride Service
+Payment Service
+API Gateway
+Service Registry
+```
 
 ---
 
-### 👤 User Service
+# 🔐 Auth Service
 
-Responsible for managing passenger/user information.
+The Auth Service handles authentication and authorization.
 
-Responsibilities include:
+### Implemented
+
+* User authentication
+* Driver authentication
+* JWT-based authentication
+* Access token generation
+* Spring Security integration
+* Protected APIs
+* Role-based authorization
+
+The JWT is sent with requests using:
+
+```http
+Authorization: Bearer <token>
+```
+
+The protected services validate the JWT before allowing access to secured endpoints.
+
+---
+
+# 👤 User Service
+
+The User Service manages user-related functionality.
+
+### Responsibilities
 
 * User registration
-* User profile management
-* User information retrieval
-* User-related ride information
-* Communication with other services using OpenFeign
+* User information
+* User-related operations
+* Communication with other services through Feign
+
+The User Service is separated from authentication so that authentication responsibilities remain inside the Auth Service.
 
 ---
 
-### 🚗 Driver Service
+# 🚗 Driver Service
 
-Responsible for driver management and real-time driver availability.
+The Driver Service manages driver-related functionality.
 
-Features include:
+### Implemented
 
 * Driver registration
-* Driver profile management
+* Driver information
 * Driver availability
 * Driver location updates
-* Nearby-driver discovery
+* Driver location storage using Redis
+* Searching for nearby drivers
 * Driver ride acceptance
 
-Driver locations are maintained using **Redis Geospatial commands**.
-
-Example Redis operations:
-
-```text
-GEOADD
-GEOSEARCH
-```
-
-This allows the system to efficiently find drivers near a passenger's pickup location.
+Driver locations are maintained using Redis Geospatial functionality.
 
 ---
 
-### 🚕 Ride Service
+# 📍 Redis Geospatial Driver Tracking
 
-The Ride Service is the core service of the application.
+Redis is used to store the geographical location of available drivers.
 
-Responsibilities include:
+The project uses a Redis GEO index for driver locations.
 
-* Ride creation
-* Pickup and destination management
-* Driver assignment
-* Fare calculation
-* Ride status management
-* Ride acceptance
-* OTP verification
-* Ride completion
-* Payment status integration
-
-Example ride lifecycle:
-
-```text
-REQUESTED
-    ↓
-DRIVER_ASSIGNED
-    ↓
-ACCEPTED
-    ↓
-DRIVER_ARRIVED
-    ↓
-RIDE_STARTED
-    ↓
-COMPLETED
-    ↓
-PAYMENT_PENDING
-    ↓
-PAYMENT_COMPLETED
-```
-
-The ride is **not considered fully completed until the payment process succeeds**.
-
----
-
-# 📍 Driver Location & Redis
-
-Redis is used for storing driver geographical locations.
-
-Instead of repeatedly querying the relational database for nearby drivers, driver coordinates are stored in a Redis GEO index.
-
-Example:
+Example Redis key:
 
 ```text
 driver-location
 ```
 
-A driver's longitude and latitude can be stored using Redis GEO commands.
+Driver coordinates are stored using Redis geospatial commands.
 
-Nearby-driver search can then be performed using:
+The application uses operations such as:
 
 ```text
+GEOADD
 GEOSEARCH
+ZRANGE
 ```
 
-This provides a much more efficient approach for location-based driver discovery.
+This allows the Ride Booking system to find drivers based on their geographical distance from the pickup location.
+
+Example:
+
+```text
+Passenger
+    │
+    │ Pickup Location
+    ▼
+Ride Service
+    │
+    ▼
+Driver Service
+    │
+    ▼
+Redis GEO
+    │
+    ▼
+Nearby Drivers
+```
+
+---
+
+# 🚕 Ride Service
+
+The Ride Service is the main business service responsible for managing rides.
+
+### Implemented
+
+* Ride creation
+* Pickup location
+* Destination location
+* Distance calculation
+* Fare calculation
+* Driver assignment
+* Driver acceptance
+* Ride status management
+* OTP verification before ride start
+* Ride completion
+* Payment status handling
+
+---
+
+# 📏 Distance Calculation
+
+The Ride Service calculates the distance between:
+
+```text
+Pickup Location
+        ↓
+Destination Location
+```
+
+using latitude and longitude coordinates.
+
+The calculated distance is then used for fare calculation.
 
 ---
 
 # 💰 Fare Calculation
 
-The Ride Service calculates the approximate distance between pickup and destination coordinates.
+The Ride Service calculates the ride fare based on the distance.
 
-The system uses geographical coordinates:
-
-```text
-Pickup Latitude
-Pickup Longitude
-
-Destination Latitude
-Destination Longitude
-```
-
-Distance is calculated and then used for fare calculation.
-
-Conceptually:
+The basic flow is:
 
 ```text
-Fare = Base Fare + Distance × Per-KM Rate
+Pickup Coordinates
+        +
+Destination Coordinates
+        ↓
+Distance Calculation
+        ↓
+Fare Calculation
+        ↓
+Ride Fare
 ```
 
-The fare calculation is kept inside the Ride Service so that ride-related business logic remains centralized.
+The fare is stored as part of the ride information and is later used by the Payment Service.
 
 ---
 
-# 💳 Payment Integration
+# 🔑 OTP Verification
 
-The application integrates with **Razorpay** for online payments.
+OTP verification has been added to prevent a ride from being started without passenger verification.
 
-Payment Service maintains information such as:
+The flow is:
+
+```text
+Driver reaches pickup
+        ↓
+OTP verification
+        ↓
+OTP is valid
+        ↓
+Ride starts
+```
+
+The ride cannot proceed to the ride-start stage without successful OTP verification.
+
+---
+
+# 🔄 Ride Status
+
+The Ride Service maintains the state of the ride throughout its lifecycle.
+
+One of the important additions is:
+
+```text
+PAYMENT_PENDING
+```
+
+The ride is not treated as completely finished until the payment has been successfully processed.
+
+The flow is:
+
+```text
+Ride Started
+      ↓
+Ride Completed
+      ↓
+PAYMENT_PENDING
+      ↓
+Payment Successful
+      ↓
+Final Payment Completion
+```
+
+---
+
+# 💳 Payment Service
+
+A separate Payment Service has been implemented for handling ride payments.
+
+The payment entity contains information such as:
 
 ```text
 paymentId
@@ -217,176 +298,225 @@ gatewayPaymentId
 paymentLink
 ```
 
-### Payment Flow
-
-```text
-Ride Completed
-      ↓
-Payment Pending
-      ↓
-Create Razorpay Order
-      ↓
-User Completes Payment
-      ↓
-Razorpay
-      ↓
-Webhook
-      ↓
-Payment Service
-      ↓
-Verify Signature
-      ↓
-Payment Successful
-      ↓
-Update Ride Payment Status
-```
-
-The system uses Razorpay webhooks to receive payment status updates from the payment gateway.
+This keeps payment-related responsibilities separate from the Ride Service.
 
 ---
 
-# 🔔 Razorpay Webhooks
+# 💰 Razorpay Integration
 
-The Payment Service exposes a webhook endpoint for Razorpay events.
+The application integrates **Razorpay** as the payment gateway.
+
+The Payment Service provides an API to create a Razorpay order.
+
+Example:
+
+```http
+POST /api/create-order
+```
+
+The backend creates the Razorpay order and returns the required payment information to the client.
+
+---
+
+# 🔔 Razorpay Webhook
+
+A Razorpay webhook has also been implemented.
+
+Endpoint:
 
 ```http
 POST /api/payment/webhook
 ```
 
-The webhook handler:
+The webhook is used to receive payment events from Razorpay.
 
-1. Receives the Razorpay event.
-2. Extracts the webhook payload.
-3. Verifies the Razorpay webhook signature.
-4. Determines the payment status.
-5. Updates the payment record.
-6. Communicates the successful payment state back to the Ride Service.
+The flow is:
 
-This prevents the application from relying solely on the frontend to determine whether payment succeeded.
+```text
+User completes payment
+        ↓
+Razorpay
+        ↓
+Webhook
+        ↓
+Payment Service
+        ↓
+Verify webhook signature
+        ↓
+Update payment status
+        ↓
+Update ride payment status
+```
+
+The webhook signature is verified before accepting the payment event.
+
+This prevents unauthorized requests from being treated as valid Razorpay payment notifications.
+
+---
+
+# 🔗 Payment → Ride Service Communication
+
+The Payment Service communicates with the Ride Service using a Feign Client.
+
+After receiving a successful payment event:
+
+```text
+Razorpay
+    ↓
+Payment Webhook
+    ↓
+Payment Service
+    ↓
+Payment Successful
+    ↓
+Feign Client
+    ↓
+Ride Service
+    ↓
+Update Ride Payment Status
+```
+
+This ensures that the Ride Service knows when the corresponding payment has actually succeeded.
 
 ---
 
 # 🔄 Inter-Service Communication
 
-The application uses **OpenFeign** for synchronous communication between microservices.
+The project uses **Spring Cloud OpenFeign** for communication between microservices.
 
-Example:
+For example:
 
 ```text
-Ride Service
-     │
-     │ Feign
-     ▼
 Payment Service
+       │
+       │ Feign Client
+       ▼
+Ride Service
 ```
 
-This allows services to communicate through strongly typed HTTP clients instead of manually constructing HTTP requests.
+Feign allows the services to communicate through declarative HTTP clients instead of manually creating HTTP requests.
 
-Example use cases:
+---
 
-* Ride Service → Driver Service
-* Ride Service → User Service
-* Payment Service → Ride Service
+# 🌐 API Gateway
+
+An API Gateway has been added to provide a single entry point to the microservices.
+
+```text
+Client
+  │
+  ▼
+API Gateway
+  │
+  ├── Auth Service
+  ├── User Service
+  ├── Driver Service
+  ├── Ride Service
+  └── Payment Service
+```
+
+The Gateway routes requests to the appropriate microservice.
+
+---
+
+# 🧭 Service Registry
+
+The project uses **Netflix Eureka** as the Service Registry.
+
+Each microservice registers itself with Eureka.
+
+```text
+                  Eureka
+                    │
+        ┌───────────┼───────────┐
+        │           │           │
+        ▼           ▼           ▼
+      Auth         Ride       Payment
+     Service      Service     Service
+```
+
+This allows services to discover each other without relying entirely on hardcoded service URLs.
 
 ---
 
 # ⚡ Kafka
 
-Apache Kafka is used for **asynchronous event-driven communication**.
+Apache Kafka has been added to the project for event-driven communication.
 
-Instead of tightly coupling every operation through synchronous HTTP calls, important events can be published to Kafka.
+Kafka infrastructure has been configured using Docker/Kafka setup.
 
-Example:
+The purpose is to provide asynchronous communication between services where required.
 
-```text
-Ride Service
-     │
-     │ Ride Created
-     ▼
-    Kafka
-     │
-     ├──────────────► Notification Service
-     │
-     ├──────────────► Payment Service
-     │
-     └──────────────► Other Consumers
-```
-
-Potential events include:
-
-```text
-RIDE_CREATED
-RIDE_ACCEPTED
-RIDE_STARTED
-RIDE_COMPLETED
-PAYMENT_COMPLETED
-DRIVER_ASSIGNED
-```
-
-This architecture allows additional consumers to be introduced without heavily modifying the Ride Service.
+The project has also involved Kafka broker/controller configuration using the **KRaft architecture**.
 
 ---
 
 # 🔒 Concurrency Handling
 
-Ride booking introduces real-world concurrency problems.
+Ride booking introduces a concurrency problem when multiple drivers attempt to accept the same ride simultaneously.
 
 For example:
 
 ```text
-Driver A
-   │
-   ├── Request 1 ──► Accept Ride #123
-   │
-   └── Request 2 ──► Accept Ride #123
+Driver A ───────┐
+                │
+                ├──► Ride #123
+                │
+Driver B ───────┘
 ```
 
-Two requests could attempt to modify the same ride simultaneously.
+Both requests cannot successfully accept the same ride.
 
-The application addresses concurrency using database-level techniques such as:
+The project addresses this using database concurrency concepts.
 
 ### Pessimistic Locking
 
-A database row can be locked while a ride is being accepted.
+A database row can be locked while processing the ride acceptance transaction.
 
 Conceptually:
 
 ```text
-SELECT ... FOR UPDATE
+Transaction starts
+       ↓
+Lock Ride
+       ↓
+Check Ride Status
+       ↓
+Accept Ride
+       ↓
+Commit
+       ↓
+Release Lock
 ```
 
-This ensures that only one transaction can modify the locked ride at a time.
+This prevents another transaction from modifying the same ride simultaneously.
 
 ### Optimistic Locking
 
-Entity versioning can also be used:
+Entity versioning can also be used to detect concurrent updates.
 
-```text
+Example:
+
+```java
 @Version
 private Long version;
 ```
 
-If two transactions attempt to update the same entity simultaneously, the stale transaction can fail instead of silently overwriting another update.
-
-This is particularly useful for preventing issues such as:
-
-```text
-Two drivers
-     ↓
-Accept same ride
-     ↓
-Only one should succeed
-```
+If another transaction modifies the entity first, the stale transaction can fail instead of overwriting the newer data.
 
 ---
 
 # 🗄️ Database
 
-The application uses a relational database for persistent transactional data.
+The application uses relational databases for persistent application data.
 
-PostgreSQL/MySQL can be used depending on the environment.
+The project has used:
 
-Typical entities include:
+* PostgreSQL
+* MySQL
+* JPA/Hibernate
+
+Persistent business data includes entities such as:
 
 ```text
 User
@@ -395,172 +525,148 @@ Ride
 Payment
 ```
 
-Relational storage is used for data that requires:
-
-* Transactions
-* Consistency
-* Relationships
-* Durable persistence
-* Querying
-
-Redis is used separately for high-speed geospatial/location operations.
-
----
-
-# 🧩 Microservices
-
-The project is divided into independent services:
-
-```text
-Auth Service
-User Service
-Driver Service
-Ride Service
-Payment Service
-Notification Service
-API Gateway
-Config Server
-Service Registry
-```
-
-Each service has a focused responsibility.
-
-This separation allows individual services to be:
-
-* Developed independently
-* Deployed independently
-* Scaled independently
-* Maintained independently
-
----
-
-# 🌐 API Gateway
-
-The API Gateway acts as the single entry point for clients.
-
-```text
-Client
-  ↓
-API Gateway
-  ↓
-Microservices
-```
-
-Responsibilities include:
-
-* Request routing
-* Centralized entry point
-* Authentication integration
-* Service discovery integration
-* Hiding internal service URLs from clients
-
----
-
-# 🧭 Service Discovery
-
-The project uses **Netflix Eureka** for service discovery.
-
-Instead of hardcoding service locations:
-
-```text
-http://localhost:8081
-http://localhost:8082
-http://localhost:8083
-```
-
-services register themselves with Eureka.
-
-```text
-             Eureka
-           /    |    \
-          /     |     \
-       Auth   Ride   Payment
-```
-
-Services can discover each other dynamically.
-
----
-
-# 🏛️ Technology Stack
-
-| Technology           | Purpose                              |
-| -------------------- | ------------------------------------ |
-| Java                 | Backend programming                  |
-| Spring Boot          | Microservice development             |
-| Spring Security      | Authentication & authorization       |
-| JWT                  | Token-based authentication           |
-| Spring Data JPA      | Database access                      |
-| PostgreSQL / MySQL   | Persistent storage                   |
-| Redis                | Caching & geospatial driver tracking |
-| Apache Kafka         | Event-driven communication           |
-| OpenFeign            | Synchronous service communication    |
-| Eureka               | Service discovery                    |
-| Spring Cloud Gateway | API Gateway                          |
-| Razorpay             | Payment processing                   |
-| Docker               | Containerization                     |
-| Maven                | Build & dependency management        |
-| Postman              | API testing                          |
-| Ngrok                | Local webhook testing                |
-
----
-
-# 🔐 Security
-
-The application uses JWT-based authentication.
-
-Typical request flow:
-
-```text
-Login
-  ↓
-Auth Service
-  ↓
-JWT Access Token
-  ↓
-Client
-  ↓
-Authorization: Bearer <token>
-  ↓
-API Gateway / Service
-  ↓
-Spring Security
-  ↓
-Authorized Request
-```
-
-Protected endpoints require a valid JWT.
-
-Different roles such as:
-
-```text
-USER
-DRIVER
-```
-
-can be used to control access to APIs.
+Redis is used separately for fast driver-location/geospatial operations.
 
 ---
 
 # 🐳 Docker
 
-Infrastructure components can be containerized using Docker.
+Docker is used for running infrastructure components required by the application.
 
-Example infrastructure:
+The project has included containerized infrastructure such as:
 
 ```text
-PostgreSQL
 Redis
 Kafka
-Zookeeper / Kafka KRaft
+PostgreSQL
+pgAdmin
 ```
 
-This provides a consistent development environment and makes the application easier to run across different machines.
+Docker Compose can be used to manage multiple infrastructure containers together.
 
 ---
 
-# 📦 Project Structure
+# 🧪 API Testing
 
-A simplified structure:
+The APIs have been tested using **Postman**.
+
+Testing includes:
+
+* Registration
+* Login
+* JWT authentication
+* Driver APIs
+* Driver location updates
+* Nearby driver search
+* Ride creation
+* Ride acceptance
+* Ride status updates
+* OTP verification
+* Payment order creation
+* Razorpay webhook
+* Payment status updates
+* Protected APIs
+
+---
+
+# 🔄 Complete Ride Flow
+
+The current implemented flow can be represented as:
+
+```text
+                    User
+                     │
+                     ▼
+              Authentication
+                     │
+                     ▼
+                 JWT Token
+                     │
+                     ▼
+               Create Ride
+                     │
+                     ▼
+              Ride Service
+                     │
+                     ▼
+          Search Nearby Drivers
+                     │
+                     ▼
+              Redis GEO
+                     │
+                     ▼
+              Driver Found
+                     │
+                     ▼
+            Driver Accepts Ride
+                     │
+                     ▼
+             OTP Verification
+                     │
+                     ▼
+                Ride Starts
+                     │
+                     ▼
+               Ride Completes
+                     │
+                     ▼
+             PAYMENT_PENDING
+                     │
+                     ▼
+             Create Razorpay Order
+                     │
+                     ▼
+            User Makes Payment
+                     │
+                     ▼
+             Razorpay Webhook
+                     │
+                     ▼
+          Verify Webhook Signature
+                     │
+                     ▼
+           Payment Successful
+                     │
+                     ▼
+            Payment Service
+                     │
+                  Feign
+                     │
+                     ▼
+              Ride Service
+                     │
+                     ▼
+          Update Payment Status
+```
+
+---
+
+# 🛠️ Technology Stack
+
+| Technology           | Usage                          |
+| -------------------- | ------------------------------ |
+| Java                 | Backend development            |
+| Spring Boot          | Microservices                  |
+| Spring Security      | Security                       |
+| JWT                  | Authentication                 |
+| Spring Data JPA      | Persistence                    |
+| Hibernate            | ORM                            |
+| PostgreSQL           | Database                       |
+| MySQL                | Database                       |
+| Redis                | Driver geolocation             |
+| Apache Kafka         | Event-driven communication     |
+| OpenFeign            | Inter-service communication    |
+| Netflix Eureka       | Service discovery              |
+| Spring Cloud Gateway | API Gateway                    |
+| Razorpay             | Payment gateway                |
+| Docker               | Containerization               |
+| Maven                | Build management               |
+| Postman              | API testing                    |
+| Ngrok                | Local Razorpay webhook testing |
+
+---
+
+# 📁 Project Structure
 
 ```text
 RideBooking/
@@ -575,11 +681,7 @@ RideBooking/
 │
 ├── payment-service/
 │
-├── notification-service/
-│
 ├── api-gateway/
-│
-├── config-server/
 │
 ├── service-registry/
 │
@@ -588,152 +690,62 @@ RideBooking/
 
 ---
 
-# 🔄 End-to-End Ride Flow
+# 🔑 Core Backend Concepts Implemented
 
-```text
-1. User logs in
-        ↓
-2. Auth Service generates JWT
-        ↓
-3. User requests a ride
-        ↓
-4. Ride Service creates ride
-        ↓
-5. Driver Service searches Redis
-   for nearby available drivers
-        ↓
-6. Driver receives ride request
-        ↓
-7. Driver accepts ride
-        ↓
-8. Ride Service updates ride status
-        ↓
-9. Driver reaches pickup location
-        ↓
-10. OTP verification
-        ↓
-11. Ride starts
-        ↓
-12. Ride completes
-        ↓
-13. Payment becomes pending
-        ↓
-14. Razorpay payment initiated
-        ↓
-15. User completes payment
-        ↓
-16. Razorpay webhook received
-        ↓
-17. Signature verified
-        ↓
-18. Payment marked successful
-        ↓
-19. Ride payment status updated
-        ↓
-20. Notification/event published
-```
+This project currently demonstrates practical backend concepts including:
 
----
-
-# 🧪 Testing
-
-APIs can be tested using Postman.
-
-Important scenarios include:
-
-* User registration
-* User login
-* Driver registration
-* Driver location update
-* Nearby-driver search
-* Ride creation
-* Ride acceptance
-* Concurrent ride acceptance
-* Ride status transitions
-* OTP verification
-* Payment order creation
-* Razorpay webhook handling
-* Invalid webhook signature
-* Unauthorized API access
-* Expired/invalid JWT
-
----
-
-# 🎯 Key Engineering Concepts Demonstrated
-
-This project demonstrates practical backend engineering concepts including:
-
+* RESTful APIs
 * Microservices architecture
-* REST APIs
 * JWT authentication
 * Spring Security
+* Role-based authorization
+* Service discovery
+* API Gateway
+* OpenFeign
+* Redis Geospatial operations
+* Driver location tracking
+* Distance calculation
+* Fare calculation
+* OTP verification
+* Ride lifecycle management
+* Payment gateway integration
+* Razorpay order creation
+* Razorpay webhooks
+* Webhook signature verification
+* Payment state management
+* Inter-service communication
 * Database transactions
 * Pessimistic locking
 * Optimistic locking
-* Concurrency control
-* Redis Geospatial indexing
-* Distributed service communication
-* OpenFeign
-* Kafka event-driven architecture
-* Payment gateway integration
-* Webhook processing
-* Webhook signature verification
-* API Gateway
-* Service discovery
-* Docker
-* Database persistence
-* Asynchronous processing
+* Kafka infrastructure
+* Dockerized infrastructure
 
 ---
 
-# 🚀 Future Improvements
+# 🎯 Project Objective
 
-Potential improvements include:
+The objective of this project is to build a **real-world ride-booking backend using a distributed microservices architecture**.
 
-* Real-time driver tracking using WebSockets
-* Dynamic/surge pricing
-* Driver-rating system
-* Ride cancellation policies
-* Kafka-based notification architecture
-* Distributed tracing with OpenTelemetry
-* Centralized logging
-* Prometheus + Grafana monitoring
-* Circuit breakers using Resilience4j
-* Rate limiting
-* Redis-based distributed locks where appropriate
-* CI/CD pipeline
-* Kubernetes deployment
-* Automated integration tests
-* Idempotency for payment and ride APIs
-
----
-
-# 👨‍💻 Project Goal
-
-The goal of this project is to build a **scalable ride-booking backend** that demonstrates how real-world systems handle:
+The application combines:
 
 ```text
 Authentication
       +
-Location
-      +
-Concurrency
-      +
-Distributed Systems
-      +
-Payments
-      +
-Event-Driven Architecture
-      +
-Caching
-      +
 Microservices
+      +
+Location Tracking
+      +
+Ride Management
+      +
+Concurrency Control
+      +
+Payment Processing
+      +
+Redis
+      +
+Kafka
+      +
+Docker
 ```
 
-The project focuses not only on CRUD operations, but also on solving **real backend engineering problems** such as concurrent ride acceptance, real-time driver discovery, payment consistency, service-to-service communication, and asynchronous event processing.
-
----
-
-## ⭐ Skills Demonstrated
-
-**Java • Spring Boot • Spring Security • JWT • Spring Cloud • Microservices • PostgreSQL • Redis • Kafka • OpenFeign • Eureka • API Gateway • Razorpay • Docker • REST APIs • JPA/Hibernate • Concurrency • Distributed Systems**
+to create a backend system that models the core functionality of a modern ride-booking platform.
