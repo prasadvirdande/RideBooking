@@ -10,7 +10,13 @@ import java.time.LocalDate;
 import java.util.UUID;
 
 @Entity
-@Table(name = "drivers")
+@Table(name = "drivers",
+
+        indexes={
+          @Index( columnList = "email", unique = true
+          )
+        }
+)
 @Data
 
 public class Driver {

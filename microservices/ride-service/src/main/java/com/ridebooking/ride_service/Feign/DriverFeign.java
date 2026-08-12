@@ -6,7 +6,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
-@FeignClient(name = "driver-service", url = "http://localhost:8083")
+@FeignClient(name = "driver-service")
 public interface DriverFeign {
 
 

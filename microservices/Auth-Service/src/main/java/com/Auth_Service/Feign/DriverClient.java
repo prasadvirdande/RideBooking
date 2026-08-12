@@ -9,7 +9,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 
-@FeignClient(name = "driver-service", url = "http://localhost:8083")
+@FeignClient(name = "driver-service")
 public interface DriverClient {
     @PostMapping("/api/driver/register")
     UserDto createDriver(@RequestBody DriverRequest driverRequest);

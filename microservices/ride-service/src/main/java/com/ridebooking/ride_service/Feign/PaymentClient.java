@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 
 import java.util.UUID;
 
-@FeignClient(name = "PAYMENT-SERVICE", url = "http://localhost:9090")
+@FeignClient(name = "PAYMENT-SERVICE")
 public interface PaymentClient {
 
     @PostMapping("/api/payment/create")

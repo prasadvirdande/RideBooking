@@ -5,6 +5,8 @@ import com.ridebooking.ride_service.DTO.Event.RideAcceptedRideEvent;
 import com.ridebooking.ride_service.DTO.Event.RideStartedEvent;
 import com.ridebooking.ride_service.Entity.Ride;
 import com.ridebooking.ride_service.Enums.RideStatus;
+import com.ridebooking.ride_service.Exception.RIdeNotAccepted;
+import com.ridebooking.ride_service.Exception.UserOrRIdeNotFOund;
 import com.ridebooking.ride_service.Feign.DriverFeign;
 import com.ridebooking.ride_service.Feign.PaymentClient;
 import com.ridebooking.ride_service.Feign.UserFeign;
@@ -55,7 +57,7 @@ public class RideServiceImpl implements RideService {
                 );
 
         if (userDTO == null || driverDTO == null) {
-            throw new RuntimeException(
+            throw new UserOrRIdeNotFOund(
                     "User or Driver not found"
             );
         }
@@ -140,7 +142,7 @@ public class RideServiceImpl implements RideService {
         System.out.println("RIDE STATUS:"+ ride.getId());
 
         if (ride.getRideStatus() != RideStatus.REQUESTED) {
-            throw new RuntimeException("Ride is not in REQUESTED status");
+            throw new RIdeNotAccepted("Ride is not in REQUESTED status");
         }
         System.out.println("Ride Status = " + ride.getRideStatus());
 

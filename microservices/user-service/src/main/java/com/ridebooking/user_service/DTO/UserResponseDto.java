@@ -1,5 +1,6 @@
 package com.ridebooking.user_service.DTO;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import lombok.*;
 
 import java.time.LocalDateTime;
@@ -27,6 +28,7 @@ import java.util.UUID;
 
             private String status;
 
+            @JsonIgnore
             private LocalDateTime createdAt;
 
         }

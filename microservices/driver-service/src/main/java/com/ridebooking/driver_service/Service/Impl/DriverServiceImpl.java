@@ -10,6 +10,7 @@ import com.ridebooking.driver_service.Service.DriverService;
 import jakarta.transaction.Transactional;
 import lombok.AllArgsConstructor;
 
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.data.geo.*;
 import org.springframework.data.redis.connection.RedisGeoCommands;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -145,6 +146,7 @@ public class DriverServiceImpl implements DriverService {
     }
 
     @Override
+    @Cacheable(value = "drivers", key = "#driverId")
     public DriverResponseDto getDriverById(String driverId) {
         Driver driver = driverepo.findById(UUID.fromString(driverId)).orElseThrow(() -> new RuntimeException("Driver not found"));
         return mapToDriverResponseDto(driver);
@@ -167,6 +169,7 @@ public class DriverServiceImpl implements DriverService {
     }
 
     @Override
+    @Cacheable(value = "drivers", key = "#email")
     public DriverResponseDto getDriverByEmail(String email) {
         Driver driver = driverepo.findByEmail(email).orElseThrow(() -> new DriverNotFound("Driver not found"));
         return mapToDriverResponseDto(driver);

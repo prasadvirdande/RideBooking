@@ -1,12 +1,12 @@
 package com.ridebooking.driver_service.DTO;
 
-import lombok.Builder;
-import lombok.Data;
+import lombok.*;
 
-import java.time.LocalDate;
 import java.util.UUID;
 
 @Data
+@AllArgsConstructor
+@NoArgsConstructor
 @Builder
 public class DriverResponseDto {
     private UUID id;

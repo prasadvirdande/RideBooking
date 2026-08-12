@@ -15,6 +15,7 @@ import java.util.UUID;
 public interface Driverepo extends JpaRepository<Driver, UUID> {
 
 
+    @Query("SELECT d from Driver d where d.email=:email")
     Optional<Driver> findByEmail(String email);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

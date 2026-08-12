@@ -11,6 +11,7 @@ import com.ridebooking.user_service.sharding.ShardResolver;
 import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.bouncycastle.asn1.x509.Time;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -38,6 +39,7 @@ public class ServiceImpl implements UserService {
     }
 
     @Override
+    @Cacheable(value = "users", key = "#userId")
     public UserResponseDto getUserById(UUID userId) {
 
         User user = userRepo.findById(userId)
