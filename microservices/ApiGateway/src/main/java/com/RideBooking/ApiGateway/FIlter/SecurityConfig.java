@@ -1,4 +1,4 @@
-package com.ridebooking.Api_Gateway.Filter;
+package com.RideBooking.ApiGateway.FIlter;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -17,12 +17,10 @@ public class SecurityConfig {
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
                 .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
                 .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
-                .logout(ServerHttpSecurity.LogoutSpec::disable)
-
                 .authorizeExchange(exchange -> exchange
+                        .pathMatchers("/api/auth/login","/api/driver/login","api/auth/register","api/auth/driver/register").permitAll()
                         .anyExchange().permitAll()
                 )
-
                 .build();
     }
 }

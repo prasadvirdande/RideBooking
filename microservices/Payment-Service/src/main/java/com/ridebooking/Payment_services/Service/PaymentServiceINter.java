@@ -6,7 +6,7 @@ import com.ridebooking.Payment_services.DTO.PaymentResponseDTO;
 import java.util.UUID;
 
 public interface PaymentServiceINter {
-    PaymentResponseDTO createPayment(PaymentRequestDTO request);
+    PaymentResponseDTO createPayment(PaymentRequestDTO request, String idempotencyKey);
 
     PaymentResponseDTO getPaymentByRideId(UUID rideId);
 

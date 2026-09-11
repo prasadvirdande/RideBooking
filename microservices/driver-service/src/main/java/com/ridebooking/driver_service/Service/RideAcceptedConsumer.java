@@ -40,6 +40,7 @@ public class RideAcceptedConsumer {
         driverepo.save(driver);
     }
 
+
     public void consume1(RideStartedEvent event1) {
       System.out.println("Ride Started");
         Driver driver =

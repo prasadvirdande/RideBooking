@@ -268,7 +268,6 @@ public class RideServiceImpl implements RideService {
     }
 
     @Override
-    @Transactional
     public void startRide(StartRideDTO startRideDTO) {
 
         Ride ride = rideRepository.findById(
@@ -398,8 +397,13 @@ public class RideServiceImpl implements RideService {
                 .amount(savedRide.getFare())
                 .build();
 
+        String idempotencyKey =  savedRide.getId().toString();
+
         PaymentResponseDTO paymentResponse =
-                paymentClient.createPayment(paymentRequest);
+                paymentClient.createPayment(
+                        paymentRequest,
+                        idempotencyKey
+                );
 
         if (paymentResponse == null ||
                 paymentResponse.getPaymentLink() == null) {

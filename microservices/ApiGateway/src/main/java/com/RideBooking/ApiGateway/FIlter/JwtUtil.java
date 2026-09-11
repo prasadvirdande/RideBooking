@@ -1,4 +1,5 @@
-package com.ridebooking.Api_Gateway.Filter;
+package com.RideBooking.ApiGateway.FIlter;
+
 
 
 import io.jsonwebtoken.Claims;
@@ -8,28 +9,40 @@ import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import javax.crypto.SecretKey;
+import java.security.Key;
 import java.util.List;
 
 @Service
-public class JwtService {
+public class JwtUtil {
+
 
     @Value("${jwt.secret}")
     private String secretKey;
 
+
+
     public String extractUsername(String token) {
-        return extractAllClaims(token).getSubject();
+
+        return extractAllClaims(token)
+                .getSubject();
     }
 
     public List<String> extractRoles(String token) {
-        return extractAllClaims(token).get("roles", List.class);
+
+        return extractAllClaims(token)
+                .get("roles", List.class);
     }
 
     public boolean isTokenValid(String token) {
+
         try {
+
             extractAllClaims(token);
+
             return true;
+
         } catch (Exception e) {
+
             return false;
         }
     }
@@ -37,16 +50,20 @@ public class JwtService {
     private Claims extractAllClaims(String token) {
 
         return Jwts.parser()
-                .verifyWith(getSigningKey())
-                .build()
-                .parseSignedClaims(token)
-                .getPayload();
+                .setSigningKey(getSignInKey())
+                .parseClaimsJws(token)
+                .getBody();
     }
 
-    private SecretKey getSigningKey() {
+    private Key getSignInKey() {
 
-        byte[] keyBytes = Decoders.BASE64.decode(secretKey);
+        byte[] keyBytes =
+                Decoders.BASE64.decode(secretKey);
 
         return Keys.hmacShaKeyFor(keyBytes);
     }
+
+
 }
+
+

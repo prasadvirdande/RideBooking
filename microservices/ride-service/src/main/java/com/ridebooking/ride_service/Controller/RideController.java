@@ -62,7 +62,7 @@ public class RideController {
 
         System.out.println("PAYMENT SUCCESS API HIT   ");
 
-       rideService.completeRideAfterPayment(rideId);
+        rideService.completeRideAfterPayment(rideId);
 
 
         return ResponseEntity.ok("SUCCESSSSSSSSS");

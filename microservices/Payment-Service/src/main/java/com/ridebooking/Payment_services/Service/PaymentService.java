@@ -8,12 +8,16 @@ import com.ridebooking.Payment_services.DTO.PaymentReceiptRequest;
 import com.ridebooking.Payment_services.DTO.PaymentRequestDTO;
 import com.ridebooking.Payment_services.DTO.PaymentResponseDTO;
 import com.ridebooking.Payment_services.DTO.UserResponseDto;
+import com.ridebooking.Payment_services.Entity.Enums.IdempotencyStatus;
 import com.ridebooking.Payment_services.Entity.Enums.PaymentMethods;
 import com.ridebooking.Payment_services.Entity.Enums.PaymentStatus;
+import com.ridebooking.Payment_services.Entity.Idempotency;
 import com.ridebooking.Payment_services.Entity.Payment;
+import com.ridebooking.Payment_services.ExceptionHandling.PaymentNotFOund;
 import com.ridebooking.Payment_services.FeignCLient.Feign;
 import com.ridebooking.Payment_services.FeignCLient.NotificationFeign;
 import com.ridebooking.Payment_services.FeignCLient.RideClient;
+import com.ridebooking.Payment_services.Repository.IdempotencyREpo;
 import com.ridebooking.Payment_services.Repository.PaymentRepo;
 import jakarta.transaction.Transactional;
 import org.json.JSONObject;
@@ -32,6 +36,7 @@ public class PaymentService implements PaymentServiceINter {
     private final Feign feign;
     private final RideClient rideClient;
     private final NotificationFeign notificationFeign;
+    private final IdempotencyREpo idempotencyREpo;
 
     @Value("${razorpay.key.id}")
     private String keyId;
@@ -44,17 +49,36 @@ public class PaymentService implements PaymentServiceINter {
 
     public PaymentService(PaymentRepo paymentRepo,
                           Feign feign,
-                          RideClient rideClient, NotificationFeign notificationFeign) {
+                          RideClient rideClient, NotificationFeign notificationFeign, IdempotencyREpo idempotencyREpo) {
         this.paymentRepo = paymentRepo;
         this.feign = feign;
         this.rideClient = rideClient;
         this.notificationFeign = notificationFeign;
+        this.idempotencyREpo = idempotencyREpo;
     }
 
     @Override
-    public PaymentResponseDTO createPayment(PaymentRequestDTO request) {
+    public PaymentResponseDTO createPayment(
+            PaymentRequestDTO request,
+            String idempotencyKey) {
 
-        // Don't create another payment if one is already pending
+        // 1. Check whether this exact request was already processed
+        Optional<Idempotency> existingIdempotency =
+                idempotencyREpo.findById(UUID.fromString(idempotencyKey));
+
+        if (existingIdempotency.isPresent()) {
+            throw new RuntimeException("Duplicate payment request");
+        }
+
+        // 2. Mark this request as PROCESSING
+        Idempotency idempotency = Idempotency.builder()
+                .id(UUID.fromString(idempotencyKey))
+                .status(IdempotencyStatus.PROCESSING)
+                .build();
+
+        idempotencyREpo.save(idempotency);
+
+        // 3. Your existing check
         Optional<Payment> existingPayment =
                 paymentRepo.findByRideId(request.getRideId());
 
@@ -62,6 +86,9 @@ public class PaymentService implements PaymentServiceINter {
                 && existingPayment.get().getPaymentStatus() == PaymentStatus.PENDING) {
 
             Payment payment = existingPayment.get();
+
+            idempotency.setStatus(IdempotencyStatus.COMPLETED);
+            idempotencyREpo.save(idempotency);
 
             return PaymentResponseDTO.builder()
                     .paymentId(payment.getPaymentId())
@@ -98,6 +125,7 @@ public class PaymentService implements PaymentServiceINter {
 
             paymentLinkRequest.put("currency", "INR");
             paymentLinkRequest.put("accept_partial", false);
+
             paymentLinkRequest.put(
                     "description",
                     "Ride Payment : " + request.getRideId());
@@ -132,6 +160,10 @@ public class PaymentService implements PaymentServiceINter {
 
             Payment savedPayment = paymentRepo.save(payment);
 
+            // 4. Mark idempotency as COMPLETED
+            idempotency.setStatus(IdempotencyStatus.COMPLETED);
+            idempotencyREpo.save(idempotency);
+
             return PaymentResponseDTO.builder()
                     .paymentId(savedPayment.getPaymentId())
                     .rideId(savedPayment.getRideId())
@@ -149,16 +181,19 @@ public class PaymentService implements PaymentServiceINter {
                     .build();
 
         } catch (RazorpayException e) {
-            throw new RuntimeException("Unable to create Razorpay Payment Link", e);
+
+            idempotency.setStatus(IdempotencyStatus.FAILED);
+            idempotencyREpo.save(idempotency);
+
+            throw new RuntimeException(
+                    "Unable to create Razorpay Payment Link", e);
         }
-
     }
-
     @Override
     public PaymentResponseDTO getPaymentByRideId(UUID rideId) {
 
             Payment payment = paymentRepo.findByRideId(rideId)
-                    .orElseThrow(() -> new RuntimeException("Payment not found"));
+                    .orElseThrow(() -> new PaymentNotFOund("Payment not found"));
 
             return PaymentResponseDTO.builder()
                     .paymentId(payment.getPaymentId())
@@ -179,110 +214,199 @@ public class PaymentService implements PaymentServiceINter {
 
 
     @Override
-    @Transactional
+
     public void handleWebhook(String payload, String signature) {
+
+
+        if (payload == null || payload.isBlank()) {
+            throw new RuntimeException("Webhook payload is empty");
+        }
+
+        if (signature == null || signature.isBlank()) {
+            throw new RuntimeException("X-Razorpay-Signature is missing");
+        }
+
+        if (webhookSecret == null || webhookSecret.isBlank()) {
+            throw new RuntimeException("Razorpay webhook secret is not configured");
+        }
+
+
+        boolean isValid;
 
         try {
 
-            // Verify Razorpay webhook signature
-            boolean isValid = Utils.verifyWebhookSignature(
+            isValid = Utils.verifyWebhookSignature(
                     payload,
                     signature,
                     webhookSecret
             );
 
-            if (!isValid) {
-                throw new RuntimeException("Invalid Razorpay webhook signature");
-            }
+        } catch (Exception e) {
 
-            System.out.println("========== WEBHOOK ==========");
-            System.out.println(payload);
-            System.out.println("=============================");
+            e.printStackTrace();
 
-            JSONObject json = new JSONObject(payload);
+            throw new RuntimeException(
+                    "Razorpay webhook signature verification failed",
+                    e
+            );
+        }
 
-            String event = json.getString("event");
-            System.out.println("Event : " + event);
+        if (!isValid) {
 
-            if (!"payment_link.paid".equals(event)
-                    && !"payment.captured".equals(event)) {
-                return;
-            }
+            System.out.println(" INVALID RAZORPAY WEBHOOK SIGNATURE");
 
-            String paymentLinkId;
+            throw new RuntimeException(
+                    "Invalid Razorpay webhook signature"
+            );
+        }
 
-            if ("payment_link.paid".equals(event)) {
+        System.out.println("RAZORPAY WEBHOOK SIGNATURE VERIFIED");
 
-                // Payment Link webhook
-                paymentLinkId = json
-                        .getJSONObject("payload")
-                        .getJSONObject("payment_link")
-                        .getJSONObject("entity")
-                        .getString("id");
+        System.out.println("========== WEBHOOK ==========");
+        System.out.println(payload);
+        System.out.println("=============================");
 
-            } else {
+        JSONObject json = new JSONObject(payload);
 
-                // payment.captured webhook
-                JSONObject paymentEntity = json
-                        .getJSONObject("payload")
-                        .getJSONObject("payment")
-                        .getJSONObject("entity");
+        String event = json.getString("event");
 
-                String description = paymentEntity.optString("description", "");
+        System.out.println("Event : " + event);
 
-                if (description.startsWith("#")) {
-                    description = description.substring(1);
-                }
+        // =========================================================
+        // 4. IGNORE UNNECESSARY EVENTS
+        // =========================================================
 
-                paymentLinkId = "plink_" + description;
-            }
+        if (!"payment_link.paid".equals(event)
+                && !"payment.captured".equals(event)) {
 
-            System.out.println("Payment Link Id : " + paymentLinkId);
+            System.out.println(
+                    "Ignoring webhook event : " + event
+            );
 
-            Payment payment = (Payment) paymentRepo
-                    .findByGatewayOrderId(paymentLinkId)
-                    .orElseThrow(() ->
-                            new RuntimeException("Payment not found : " + paymentLinkId));
-            // Ignore duplicate webhook deliverie
-            if (payment.getPaymentStatus() == PaymentStatus.SUCCESS) {
-                System.out.println("Payment already processed.");
-                return;
-            }
+            return;
+        }
 
-            payment.setPaymentStatus(PaymentStatus.SUCCESS);
+        String paymentLinkId;
+
+        if ("payment_link.paid".equals(event)) {
+
+            paymentLinkId = json
+                    .getJSONObject("payload")
+                    .getJSONObject("payment_link")
+                    .getJSONObject("entity")
+                    .getString("id");
+
+        } else {
 
             JSONObject paymentEntity = json
                     .getJSONObject("payload")
                     .getJSONObject("payment")
                     .getJSONObject("entity");
 
-            payment.setGatewayPaymentId(paymentEntity.getString("id"));
+            String description =
+                    paymentEntity.optString("description", "");
 
-            payment.setPaymentTime(LocalDateTime.now());
+            if (description.startsWith("#")) {
+                description = description.substring(1);
+            }
 
-            paymentRepo.save(payment);
+            paymentLinkId = "plink_" + description;
+        }
 
-            // Notify Ride Service
-            rideClient.paymentSuccess(payment.getRideId());
+        System.out.println(
+                "Payment Link Id : " + paymentLinkId
+        );
 
-            UserResponseDto user = feign.getUserById(payment.getUserId());
 
-            notificationFeign.sendPaymentReceipt(
-                    PaymentReceiptRequest.builder()
-                            .email(user.getEmail())
-                            .rideId(payment.getRideId().toString())
-                            .paymentId(payment.getGatewayPaymentId())
-                            .amount(payment.getAmount())
-                            .build()
+
+        Payment payment = (Payment) paymentRepo
+                .findByGatewayOrderId(paymentLinkId)
+                .orElseThrow(() ->
+                        new PaymentNotFOund(
+                                "Payment not found : "
+                                        + paymentLinkId
+                        )
+                );
+
+
+
+        if (payment.getPaymentStatus()
+                == PaymentStatus.SUCCESS) {
+
+            System.out.println(
+                    "Payment already processed."
             );
 
-            System.out.println("Payment successful for Ride : "
-                    + payment.getRideId());
-
-        } catch (Exception e) {
-            e.printStackTrace();
-            throw new RuntimeException("Webhook processing failed", e);
+            return;
         }
+
+
+        JSONObject paymentEntity = json
+                .getJSONObject("payload")
+                .getJSONObject("payment")
+                .getJSONObject("entity");
+
+        String razorpayPaymentId =
+                paymentEntity.getString("id");
+
+
+        payment.setPaymentStatus(
+                PaymentStatus.SUCCESS
+        );
+
+        payment.setGatewayPaymentId(
+                razorpayPaymentId
+        );
+
+        payment.setPaymentTime(
+                LocalDateTime.now()
+        );
+
+        paymentRepo.save(payment);
+
+        System.out.println(
+                "Payment marked SUCCESS : "
+                        + payment.getRideId()
+        );
+
+        // =========================================================
+        // 10. NOTIFY RIDE SERVICE
+        // =========================================================
+
+        rideClient.paymentSuccess(
+                payment.getRideId()
+        );
+
+        // =========================================================
+        // 11. GET USER
+        // =========================================================
+
+        UserResponseDto user =
+                feign.getUserById(
+                        payment.getUserId()
+                );
+
+        // =========================================================
+        // 12. SEND PAYMENT RECEIPT
+        // =========================================================
+
+        notificationFeign.sendPaymentReceipt(
+                PaymentReceiptRequest.builder()
+                        .email(user.getEmail())
+                        .rideId(
+                                payment.getRideId().toString()
+                        )
+                        .paymentId(
+                                payment.getGatewayPaymentId()
+                        )
+                        .amount(payment.getAmount())
+                        .build()
+        );
+
+        System.out.println(
+                "✅ Payment successful for Ride : "
+                        + payment.getRideId()
+        );
     }
     }
 

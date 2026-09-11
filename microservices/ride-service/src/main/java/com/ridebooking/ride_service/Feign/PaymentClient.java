@@ -6,7 +6,8 @@ import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 
 import java.util.UUID;
 
@@ -14,11 +15,13 @@ import java.util.UUID;
 public interface PaymentClient {
 
     @PostMapping("/api/payment/create")
-    PaymentResponseDTO createPayment(PaymentRequestDTO request);
+    PaymentResponseDTO createPayment(
+            @RequestBody PaymentRequestDTO request,
+            @RequestHeader("Idempotency-Key") String idempotencyKey
+    );
+
     @GetMapping("/api/payment/ride/{rideId}")
-    PaymentResponseDTO getPaymentByRideId(@PathVariable("rideId") UUID rideId);
-
-
-
-
+    PaymentResponseDTO getPaymentByRideId(
+            @PathVariable("rideId") UUID rideId
+    );
 }

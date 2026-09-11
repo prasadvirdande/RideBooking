@@ -29,9 +29,9 @@ public class PaymentController {
 
     @PostMapping("/create")
     public ResponseEntity<PaymentResponseDTO> createPayment(
-            @RequestBody PaymentRequestDTO request) {
+            @RequestBody PaymentRequestDTO request,  @RequestHeader("Idempotency-Key") String idempotencyKey ) {
 
-        return ResponseEntity.ok(paymentServiceINter.createPayment(request));
+        return ResponseEntity.ok(paymentServiceINter.createPayment(request,idempotencyKey));
     }
     @PostMapping("/webhook")
     public ResponseEntity<String> razorpayWebhook(
