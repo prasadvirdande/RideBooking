@@ -20,4 +20,8 @@ public interface RideService {
     CompleteRideResponseDTO completeride(CompleteRideDTO completeRideDTO);
 
     void completeRideAfterPayment(UUID rideId);
+
+    RideResponseDto getActiveRide(UUID userId);
+
+    RideResponseDto getLastCompletedRide(UUID userId);
 }

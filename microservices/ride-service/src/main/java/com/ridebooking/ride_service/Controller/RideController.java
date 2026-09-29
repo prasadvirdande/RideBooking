@@ -67,4 +67,20 @@ public class RideController {
 
         return ResponseEntity.ok("SUCCESSSSSSSSS");
     }
+    @GetMapping("/active/{userId}")
+    public ResponseEntity<RideResponseDto> getActiveRide(
+            @PathVariable UUID userId) {
+
+        return ResponseEntity.ok(
+                rideService.getActiveRide(userId)
+        );
+    }
+    @GetMapping("/completed/{userId}")
+    public ResponseEntity<RideResponseDto> getLastCompletedRide(
+            @PathVariable UUID userId) {
+
+        return ResponseEntity.ok(
+                rideService.getLastCompletedRide(userId)
+        );
+    }
 }

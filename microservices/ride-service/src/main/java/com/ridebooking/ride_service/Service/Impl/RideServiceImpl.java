@@ -486,5 +486,52 @@ public class RideServiceImpl implements RideService {
         return baseFare +
                 (distanceKm * perKmFare);
     }
-}
+    @Override
+    public RideResponseDto getActiveRide(UUID userId) {
+
+        Ride ride = rideRepository.findActiveRideByUserId(userId)
+                .orElseThrow(() -> new RuntimeException("No active ride found"));
+
+        return RideResponseDto.builder()
+                .rideId(ride.getId())
+                .userId(ride.getUserId())
+                .driverId(ride.getDriverId())
+                .pickupLatitude(ride.getPickupLatitude())
+                .pickupLongitude(ride.getPickupLongitude())
+                .destinationLatitude(ride.getDestinationLatitude())
+                .destinationLongitude(ride.getDestinationLongitude())
+                .fare(ride.getFare().doubleValue())
+                .distance(ride.getDistance().doubleValue())
+                .status(ride.getRideStatus())
+                .message("Active ride found")
+                .build();
+    }
+
+    @Override
+    public RideResponseDto getLastCompletedRide(UUID userId) {
+
+            Ride ride = rideRepository
+                    .findFirstByUserIdAndRideStatusOrderByIdDesc(
+                            userId,
+                            RideStatus.COMPLETED
+                    )
+                    .orElseThrow(() ->
+                            new RuntimeException("No completed ride found"));
+
+            return RideResponseDto.builder()
+                .rideId(ride.getId())
+                .userId(ride.getUserId())
+                .driverId(ride.getDriverId())
+                .pickupLatitude(ride.getPickupLatitude())
+                .pickupLongitude(ride.getPickupLongitude())
+                .destinationLatitude(ride.getDestinationLatitude())
+                .destinationLongitude(ride.getDestinationLongitude())
+                .fare(ride.getFare().doubleValue())
+                .distance(ride.getDistance().doubleValue())
+                .status(ride.getRideStatus())
+                .message("RIDE IS COMPLETED")
+                .build();
+        }
+    }
+
 
