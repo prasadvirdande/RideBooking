@@ -159,4 +159,10 @@ public class Jwtservice {
 
         return Keys.hmacShaKeyFor(keyBytes);
     }
+    public long getExpirationTime(String token) {
+
+        return extractAllClaims(token)
+                .getExpiration()
+                .getTime();
+    }
 }

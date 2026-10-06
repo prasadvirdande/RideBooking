@@ -41,7 +41,8 @@ public class AuthSecurity {
                                 "/api/users/login",
                                 "/api/auth/driver/login",
                                 "/api/auth/driver/register",
-                                "/api/auth/health"
+                                "/api/auth/health",
+                                "/api/auth/logout"
 
 
                         ).permitAll()

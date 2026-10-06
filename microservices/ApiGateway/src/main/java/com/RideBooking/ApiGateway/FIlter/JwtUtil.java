@@ -1,7 +1,5 @@
 package com.RideBooking.ApiGateway.FIlter;
 
-
-
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.io.Decoders;
@@ -15,11 +13,8 @@ import java.util.List;
 @Service
 public class JwtUtil {
 
-
     @Value("${jwt.secret}")
     private String secretKey;
-
-
 
     public String extractUsername(String token) {
 
@@ -62,8 +57,4 @@ public class JwtUtil {
 
         return Keys.hmacShaKeyFor(keyBytes);
     }
-
-
 }
-
-

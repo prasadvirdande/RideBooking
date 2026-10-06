@@ -6,20 +6,20 @@ import com.Auth_Service.ExceptionHandling.InvalidCredentialsException;
 import com.Auth_Service.ExceptionHandling.Usernotfound;
 import com.Auth_Service.Feign.DriverClient;
 import com.Auth_Service.Feign.UserClient;
-import com.Auth_Service.Security.AuthUserDetailsService;
+
 import com.Auth_Service.Security.Jwtservice;
 import com.Auth_Service.Service.AuthService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.userdetails.UserDetails;
+
+import org.springframework.data.redis.core.RedisTemplate;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.util.Collections;
 import java.util.Set;
-import java.util.stream.Collectors;
+import java.util.concurrent.TimeUnit;
+
 
 @Service
 @RequiredArgsConstructor
@@ -29,8 +29,8 @@ public class AuthserviceImpl implements AuthService {
     private final DriverClient driverClient;
     private final PasswordEncoder passwordEncoder;
     private final Jwtservice jwtservice;
-    private final AuthenticationManager authenticationManager;
-    private final AuthUserDetailsService authUserDetailsService;
+    private final StringRedisTemplate redisTemplate;
+
     @Override
     public AuthResponse register(AuthRequest authRequest) {
 
@@ -140,6 +140,23 @@ public class AuthserviceImpl implements AuthService {
 
     @Override
     public void logout(String token) {
+
+        long expirationTime =
+                jwtservice.getExpirationTime(token);
+
+        long remainingTime =
+                expirationTime - System.currentTimeMillis();
+
+        if (remainingTime > 0) {
+
+            redisTemplate.opsForValue().set(
+                    "blacklist:" + token,
+                    "true",
+                    remainingTime,
+                    TimeUnit.MILLISECONDS
+            );
+        }
+
         System.out.println("Logout Successful");
     }
 }

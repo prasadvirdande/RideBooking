@@ -11,15 +11,29 @@ import org.springframework.security.web.server.SecurityWebFilterChain;
 public class SecurityConfig {
 
     @Bean
-    public SecurityWebFilterChain securityWebFilterChain(ServerHttpSecurity http) {
+    public SecurityWebFilterChain securityWebFilterChain(
+            ServerHttpSecurity http) {
 
         return http
                 .csrf(ServerHttpSecurity.CsrfSpec::disable)
-                .httpBasic(ServerHttpSecurity.HttpBasicSpec::disable)
-                .formLogin(ServerHttpSecurity.FormLoginSpec::disable)
+                .httpBasic(
+                        ServerHttpSecurity.HttpBasicSpec::disable
+                )
+                .formLogin(
+                        ServerHttpSecurity.FormLoginSpec::disable
+                )
                 .authorizeExchange(exchange -> exchange
-                        .pathMatchers("/api/auth/login","/api/driver/login","api/auth/register","api/auth/driver/register").permitAll()
-                        .anyExchange().permitAll()
+
+                        .pathMatchers(
+                                "/api/auth/login",
+                                "/api/auth/register",
+                                "/api/auth/driver/login",
+                                "/api/auth/driver/register"
+                        )
+                        .permitAll()
+
+                        .anyExchange()
+                        .permitAll()
                 )
                 .build();
     }

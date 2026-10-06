@@ -37,6 +37,12 @@ public class JwtFilter extends OncePerRequestFilter {
             filterChain.doFilter(request, response);
             return;
         }
+        System.out.println("AUTH SERVICE PATH = " + request.getServletPath());
+        System.out.println("AUTH SERVICE URI  = " + request.getRequestURI());
+        if (request.getServletPath().equals("/api/auth/logout")) {
+            filterChain.doFilter(request, response);
+            return;
+        }
 
         // Extract token
         jwt = authHeader.substring(7);

@@ -2,10 +2,10 @@ package com.RideBooking.AI_SERVICES.Feign;
 
 import com.RideBooking.AI_SERVICES.DTO.DriverLocationDTO;
 import com.RideBooking.AI_SERVICES.DTO.RideResponseDto;
-import org.springframework.ai.tool.annotation.Tool;
+import com.RideBooking.AI_SERVICES.DTO.SearchRideRequest;
+import com.RideBooking.AI_SERVICES.DTO.SearchRideResponseDTO;
 import org.springframework.cloud.openfeign.FeignClient;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.UUID;
@@ -18,20 +18,24 @@ public interface RideServiceClient {
             @PathVariable("userId") UUID userId
     );
 
-
     @GetMapping("/api/ride/completed/{userId}")
     RideResponseDto getCompletedRides(
             @PathVariable("userId") UUID userId
     );
 
-   @GetMapping("/api/driver/")
-   DriverLocationDTO getDriverLocation(
+    @GetMapping("/api/driver/{driverId}")
+    DriverLocationDTO getDriverLocation(
             @PathVariable("driverId") UUID driverId
     );
 
-   @GetMapping("/api/driver/nearby/{latitude}/{longitude}")
-   List<DriverLocationDTO> getNearbyDrivers(
-            @PathVariable("latitude") Double latitude,
-            @PathVariable("longitude") Double longitude
+    @GetMapping("/api/driver/nearby")
+    List<DriverLocationDTO> getNearbyDrivers(
+            @RequestParam("latitude") Double latitude,
+            @RequestParam("longitude") Double longitude
+    );
+
+    @PostMapping("/api/ride/search")
+    SearchRideResponseDTO searchRide(
+            @RequestBody SearchRideRequest request
     );
 }

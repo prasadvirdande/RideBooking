@@ -25,6 +25,8 @@ public class RideController {
     public ResponseEntity<SearchRideResponseDTO> searchRide(
             @RequestBody SearchRideRequest request) {
 
+
+
         return ResponseEntity.ok(
                 rideService.searchRide(request)
         );

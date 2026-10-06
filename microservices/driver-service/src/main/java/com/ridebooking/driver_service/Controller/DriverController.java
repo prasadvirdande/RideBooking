@@ -20,40 +20,62 @@ public class DriverController {
 
     @GetMapping
     public ResponseEntity<List<DriverResponseDto>> getAllDrivers() {
-        return ResponseEntity.ok(driverService.getAllDrivers());
+        return ResponseEntity.ok(
+                driverService.getAllDrivers()
+        );
     }
 
     @PostMapping("/register")
-    public ResponseEntity< DriverResponseDto> createDriver(@RequestBody DriverRequestDto driverRequestDto) {
-        return ResponseEntity.ok(driverService.createDriver(driverRequestDto));
+    public ResponseEntity<DriverResponseDto> createDriver(
+            @RequestBody DriverRequestDto driverRequestDto) {
+
+        return ResponseEntity.ok(
+                driverService.createDriver(driverRequestDto)
+        );
     }
+
     @GetMapping("/email/{email}")
-    public ResponseEntity<DriverResponseDto> getDriverByEmail(@PathVariable String email) {
-        return ResponseEntity.ok(driverService.getDriverByEmail(email));
+    public ResponseEntity<DriverResponseDto> getDriverByEmail(
+            @PathVariable String email) {
+
+        return ResponseEntity.ok(
+                driverService.getDriverByEmail(email)
+        );
     }
 
     @PostMapping("/login")
-    public ResponseEntity<DriverLoginResponseDTO> loginDriver(@RequestBody DriverLoginRequestDto driverRequestDto) {
-        return ResponseEntity.ok(driverService.loginDriver(driverRequestDto));
+    public ResponseEntity<DriverLoginResponseDTO> loginDriver(
+            @RequestBody DriverLoginRequestDto driverRequestDto) {
+
+        return ResponseEntity.ok(
+                driverService.loginDriver(driverRequestDto)
+        );
     }
-//    @GetMapping("/id/{driverId}")
-//    public ResponseEntity<DriverResponseDto> getDriverById(@PathVariable String driverId) {
-//        return ResponseEntity.ok(driverService.getDriverById(driverId));
-//    }
 
     @PutMapping("/location")
-    public ResponseEntity<DriverLocationResponseDto> updateDriverLocation(@RequestBody DriverLocationUpdateDto driverLocationUpdateDto) {
-        return ResponseEntity.ok(driverService.updateDriverLocation(driverLocationUpdateDto));
+    public ResponseEntity<DriverLocationResponseDto> updateDriverLocation(
+            @RequestBody DriverLocationUpdateDto driverLocationUpdateDto) {
+
+        return ResponseEntity.ok(
+                driverService.updateDriverLocation(
+                        driverLocationUpdateDto
+                )
+        );
     }
+
     @GetMapping("/id/{id}")
-    public ResponseEntity<DriverResponseDto> getDriverById(@PathVariable UUID id) {
-        return ResponseEntity.ok(driverService.findById(id));
+    public ResponseEntity<DriverResponseDto> getDriverById(
+            @PathVariable UUID id) {
+
+        return ResponseEntity.ok(
+                driverService.findById(id)
+        );
     }
 
     @GetMapping("/nearby")
     public ResponseEntity<?> getNearbyDrivers(
-            @RequestParam Double latitude,
-            @RequestParam Double longitude) {
+            @RequestParam("latitude") Double latitude,
+            @RequestParam("longitude") Double longitude) {
 
         return ResponseEntity.ok(
                 driverService.findNearbyDrivers(
@@ -62,9 +84,13 @@ public class DriverController {
                 )
         );
     }
+
     @PostMapping("/accept/ride")
-    public ResponseEntity<String> acceptRide(@RequestBody AcceptRideRequest driverId) {
+    public ResponseEntity<String> acceptRide(
+            @RequestBody AcceptRideRequest driverId) {
+
         driverService.acceptRide(driverId);
+
         return ResponseEntity.ok("Driver is Busy");
     }
 }

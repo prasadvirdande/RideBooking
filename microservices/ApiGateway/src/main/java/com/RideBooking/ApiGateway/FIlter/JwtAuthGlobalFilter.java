@@ -1,5 +1,5 @@
-
 package com.RideBooking.ApiGateway.FIlter;
+
 import org.springframework.cloud.gateway.filter.GatewayFilterChain;
 import org.springframework.cloud.gateway.filter.GlobalFilter;
 import org.springframework.core.Ordered;
@@ -13,9 +13,14 @@ import reactor.core.publisher.Mono;
 public class JwtAuthGlobalFilter implements GlobalFilter, Ordered {
 
     private final JwtUtil jwtUtil;
+    private final TokenBlacklistService tokenBlacklistService;
 
-    public JwtAuthGlobalFilter(JwtUtil jwtUtil) {
+    public JwtAuthGlobalFilter(
+            JwtUtil jwtUtil,
+            TokenBlacklistService tokenBlacklistService) {
+
         this.jwtUtil = jwtUtil;
+        this.tokenBlacklistService = tokenBlacklistService;
     }
 
     @Override
@@ -33,16 +38,19 @@ public class JwtAuthGlobalFilter implements GlobalFilter, Ordered {
                 .getPath();
 
 
-        if (uriPath.startsWith("/api/auth")) {
+        if (uriPath.equals("/api/auth/login")
+                || uriPath.equals("/api/auth/register")
+                || uriPath.equals("/api/auth/driver/login")
+                || uriPath.equals("/api/auth/driver/register")) {
+
             return chain.filter(exchange);
         }
-
         String authHeader = exchange.getRequest()
                 .getHeaders()
                 .getFirst(HttpHeaders.AUTHORIZATION);
 
-        // JWT not provided
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+        if (authHeader == null
+                || !authHeader.startsWith("Bearer ")) {
 
             exchange.getResponse()
                     .setStatusCode(HttpStatus.UNAUTHORIZED);
@@ -51,31 +59,61 @@ public class JwtAuthGlobalFilter implements GlobalFilter, Ordered {
         }
 
         String token = authHeader.substring(7);
+        return tokenBlacklistService
+                .isBlacklisted(token)
+                .flatMap(isBlacklisted -> {
 
-        try {
 
-            if (!jwtUtil.isTokenValid(token)) {
+                    if (isBlacklisted) {
 
-                exchange.getResponse()
-                        .setStatusCode(HttpStatus.UNAUTHORIZED);
+                        exchange.getResponse()
+                                .setStatusCode(HttpStatus.UNAUTHORIZED);
 
-                return exchange.getResponse().setComplete();
-            }
+                        return exchange.getResponse()
+                                .setComplete();
+                    }
 
-            String username = jwtUtil.extractUsername(token);
-            String role = jwtUtil.extractRoles(token).toString();
 
-            System.out.println("Username: " + username);
-            System.out.println("Role: " + role);
+                    try {
 
-            return chain.filter(exchange);
+                        if (!jwtUtil.isTokenValid(token)) {
 
-        } catch (Exception e) {
+                            exchange.getResponse()
+                                    .setStatusCode(
+                                            HttpStatus.UNAUTHORIZED
+                                    );
 
-            exchange.getResponse()
-                    .setStatusCode(HttpStatus.UNAUTHORIZED);
+                            return exchange.getResponse()
+                                    .setComplete();
+                        }
 
-            return exchange.getResponse().setComplete();
-        }
+                        String username =
+                                jwtUtil.extractUsername(token);
+
+                        String role =
+                                jwtUtil.extractRoles(token).toString();
+
+                        System.out.println(
+                                "Username: " + username
+                        );
+
+                        System.out.println(
+                                "Role: " + role
+                        );
+
+
+                        return chain.filter(exchange);
+
+                    } catch (Exception e) {
+
+                        exchange.getResponse()
+                                .setStatusCode(
+                                        HttpStatus.UNAUTHORIZED
+                                );
+
+                        return exchange.getResponse()
+                                .setComplete();
+                    }
+                });
     }
 }

@@ -64,6 +64,8 @@ public class AuthController {
     @PostMapping("/logout")
     public ResponseEntity<String> logoutUser(HttpServletRequest request) {
 
+        System.out.println("LOGOUT CONTROLLER HIT");
+
         String authHeader = request.getHeader("Authorization");
 
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
