@@ -35,7 +35,5 @@ public class RideProducer {
                 "STARTED EVENT PUBLISHED : " + start
         );
     }
-//    public void completeRide(
-//
-//    )
+
 }

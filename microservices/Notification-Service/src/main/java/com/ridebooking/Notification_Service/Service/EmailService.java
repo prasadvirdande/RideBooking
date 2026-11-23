@@ -1,5 +1,6 @@
 package com.ridebooking.Notification_Service.Service;
 
+import com.ridebooking.Notification_Service.DTO.Event.PaymentReceiptEvent;
 import com.ridebooking.Notification_Service.Entity.Invoice;
 import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
@@ -26,7 +27,7 @@ public class EmailService {
 
         try {
 
-            Invoice invoice = invoiceService.generateAndSaveInvoice(
+            Invoice invoice = invoiceService.getOrCreateInvoice(
                     email,
                     rideId,
                     paymentId,
@@ -78,4 +79,6 @@ public class EmailService {
             throw new RuntimeException("Unable to send invoice email", e);
         }
     }
+
+
 }

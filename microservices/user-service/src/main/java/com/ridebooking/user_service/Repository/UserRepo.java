@@ -15,6 +15,7 @@ public interface UserRepo extends JpaRepository<User, UUID> {
    @Query(value = "select * from users where email=:email",nativeQuery = true)
    Optional<User>   findByEmail(String email);
 
+   @Query(value = "select * from users where first_name like %:keyword%",nativeQuery = true)
    List<User> findByFirstNameContainingIgnoreCase(String keyword);
 
 

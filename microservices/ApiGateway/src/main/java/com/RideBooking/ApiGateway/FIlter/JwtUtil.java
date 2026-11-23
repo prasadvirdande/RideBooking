@@ -7,7 +7,7 @@ import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.security.Key;
+import javax.crypto.SecretKey;
 import java.util.List;
 
 @Service
@@ -16,10 +16,26 @@ public class JwtUtil {
     @Value("${jwt.secret}")
     private String secretKey;
 
+    private SecretKey getSignInKey() {
+
+        byte[] keyBytes =
+                Decoders.BASE64.decode(secretKey);
+
+        return Keys.hmacShaKeyFor(keyBytes);
+    }
+
+    private Claims extractAllClaims(String token) {
+
+        return Jwts.parserBuilder()
+                .setSigningKey(getSignInKey())
+                .build()
+                .parseClaimsJws(token)
+                .getBody();
+    }
+
     public String extractUsername(String token) {
 
-        return extractAllClaims(token)
-                .getSubject();
+        return extractAllClaims(token).getSubject();
     }
 
     public List<String> extractRoles(String token) {
@@ -31,30 +47,11 @@ public class JwtUtil {
     public boolean isTokenValid(String token) {
 
         try {
-
             extractAllClaims(token);
-
             return true;
 
         } catch (Exception e) {
-
             return false;
         }
-    }
-
-    private Claims extractAllClaims(String token) {
-
-        return Jwts.parser()
-                .setSigningKey(getSignInKey())
-                .parseClaimsJws(token)
-                .getBody();
-    }
-
-    private Key getSignInKey() {
-
-        byte[] keyBytes =
-                Decoders.BASE64.decode(secretKey);
-
-        return Keys.hmacShaKeyFor(keyBytes);
     }
 }

@@ -27,19 +27,11 @@ import java.util.UUID;
 
         private PaymentStatus paymentStatus;
 
-        private PaymentMethods paymentMethod;
-
-        private String gatewayOrderId;
-
         private String paymentLink;
-
-        private String qrCode;
-
-        private String keyId;
 
         private String currency;
 
-        private String gatewayName;
+
 
     }
 

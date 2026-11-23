@@ -21,6 +21,10 @@ public class Global {
     public ResponseEntity<Map<String, Object>> handleRideNotAcceptedException(RIdeNotAccepted ex) {
         return handleException(ex, HttpStatus.BAD_REQUEST, ex.getMessage());
     }
+    @ExceptionHandler(DriverNotAvailable.class)
+    ResponseEntity<Map<String,Object>> handleDriverNotFound(DriverNotAvailable driverNotAvailable){
+        return  handleException(driverNotAvailable, HttpStatus.NOT_FOUND, driverNotAvailable.getMessage());
+    }
 
     @ExceptionHandler(UserOrRIdeNotFOund.class)
     public ResponseEntity<Map<String, Object>> handleUserOrRideNotFoundException(UserOrRIdeNotFOund ex) {

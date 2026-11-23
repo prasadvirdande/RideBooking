@@ -40,7 +40,10 @@ public class RideController {
 
     @PutMapping("/id/{rideId}")
     public ResponseEntity<AcceptedRideResponseDTO> updateRide(@PathVariable UUID rideId, @RequestBody AcceptRideRequest rideRequest) {
-        System.out.println("UPDATE RIDE API HIT");
+        System.out.println("🔥 RIDE CONTROLLER HIT");
+        System.out.println("Ride ID = " + rideId);
+        System.out.println("Request = " + rideRequest);
+
         return ResponseEntity.ok(rideService.updateRide(rideId, rideRequest));
     }
     @PostMapping("/verify/otp")

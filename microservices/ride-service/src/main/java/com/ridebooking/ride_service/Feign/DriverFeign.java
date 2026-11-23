@@ -15,10 +15,10 @@ public interface DriverFeign {
             @PathVariable("driverId") String driverId
     );
 
-    @PostMapping("/api/driver/accept/ride")
-    void acceptRide(
-            @RequestBody AcceptRideRequest acceptRideRequest
-    );
+//    @PostMapping("/api/driver/accept/ride")
+//    void acceptRide(
+//            @RequestBody AcceptRideRequest acceptRideRequest
+//    );
 
     @GetMapping("/api/driver/nearby")
     List<DriverDTO> getNearbyDrivers(

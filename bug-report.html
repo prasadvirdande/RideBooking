@@ -1,0 +1,139 @@
+﻿<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Bug Report - RideBooking Microservices</title>
+<style>
+body{font-family:Segoe UI,Arial,sans-serif;margin:40px;color:#222;line-height:1.5}
+h1{color:#1a5276;border-bottom:3px solid #1a5276;padding-bottom:8px}
+h2{color:#1a5276;margin-top:26px;border-bottom:1px solid #ccc;padding-bottom:4px}
+h3{color:#2874a6}
+table{border-collapse:collapse;width:100%;margin:12px 0;font-size:12.5px}
+th,td{border:1px solid #bbb;padding:6px 9px;text-align:left;vertical-align:top}
+th{background:#d6eaf8}
+code{background:#f2f3f4;padding:1px 5px;border-radius:3px;font-family:Consolas,monospace;font-size:11.5px}
+pre{background:#f8f9f9;border:1px solid #ddd;padding:12px;border-radius:6px;font-size:11px;white-space:pre-wrap}
+.crit{background:#fdedec;border-left:5px solid #c0392b;padding:10px 14px;margin:12px 0}
+.high{background:#fef5e7;border-left:5px solid #e67e22;padding:10px 14px;margin:12px 0}
+.med{background:#fef9e7;border-left:5px solid #f1c40f;padding:10px 14px;margin:12px 0}
+.p0{color:#c0392b;font-weight:bold}.p1{color:#e67e22;font-weight:bold}.p2{color:#2874a6;font-weight:bold}
+.fix{color:#1e8449}
+</style></head><body>
+<h1>Bug Report - RideBooking Microservices (excl. AI_SERVICES)</h1>
+<p><b>Scope:</b> ApiGateway, Auth-Service, user-service, driver-service, ride-service, Payment-Service, Notification-Service, Service-Discovery. Every file in each service was reviewed. Bugs are grouped by severity with concrete fixes.</p>
+
+<div class="crit"><b>CRITICAL - fix before anything else:</b> unauthenticated payment completion, open payment creation, password hash exposure, gateway routing mismatches, webhook blocked by gateway auth.</div>
+
+<h2>1. ApiGateway</h2>
+<table>
+<tr><th>#</th><th>Severity</th><th>Bug</th><th>Fix</th></tr>
+<tr><td>G1</td><td class="p0">CRITICAL</td><td><b>User-service unreachable via gateway.</b> Route is <code>Path=/api/user/**</code> but UserController is <code>@RequestMapping("/api/users")</code>. Every user API call through the gateway 404s.</td><td class="fix">Change route predicate to <code>/api/users/**</code> (or add both).</td></tr>
+<tr><td>G2</td><td class="p0">CRITICAL</td><td><b>Notification-service unreachable.</b> Route is <code>/api/notification/**</code> but EmailController is <code>@RequestMapping("/api/email")</code>.</td><td class="fix">Change predicate to <code>/api/email/**</code>.</td></tr>
+<tr><td>G3</td><td class="p0">CRITICAL</td><td><b>Razorpay webhook blocked.</b> <code>/api/payment/webhook</code> is not in the permitAll list of JwtAuthGlobalFilter, so Razorpay's callback gets 401 and payments never confirm.</td><td class="fix">Add <code>/api/payment/webhook</code> (and any other server-to-server callbacks) to the filter's bypass list. Signature verification in Payment-Service already protects it.</td></tr>
+<tr><td>G4</td><td class="p0">CRITICAL</td><td><b>No identity propagation.</b> Filter validates the JWT but never forwards userId/email/roles downstream (no X-User-* headers). Downstream services cannot do per-user authorization - any valid token can act as anyone.</td><td class="fix">After validation, add headers: <code>X-User-Id</code>, <code>X-User-Email</code>, <code>X-User-Roles</code> via <code>exchange.getRequest().mutate().header(...)</code>.</td></tr>
+<tr><td>G5</td><td class="p1">HIGH</td><td><b>SecurityConfig permits everything.</b> <code>.anyExchange().permitAll()</code> - the only protection is the global filter. Any bypass bug in the filter = fully open gateway.</td><td class="fix">Set <code>.anyExchange().authenticated()</code> and keep explicit permitAll only for auth endpoints + webhook.</td></tr>
+<tr><td>G6</td><td class="p1">HIGH</td><td><b>No role-based authorization.</b> extractRoles() result is computed then discarded (<code>.toString()</code> into a println). A RIDER token can call driver/admin endpoints.</td><td class="fix">Enforce roles per route (e.g. <code>/api/driver/location</code> requires DRIVER) once identity headers exist.</td></tr>
+<tr><td>G7</td><td class="p2">MED</td><td>No rate limiting, no request-id propagation, System.out.println logging, blacklist check does a Redis call per request (fine) but token used as raw Redis key (long keys, ok).</td><td class="fix">Add Bucket4j rate limiter, X-Request-Id filter, SLF4J logging.</td></tr>
+</table>
+
+<h2>2. Auth-Service</h2>
+<table>
+<tr><th>#</th><th>Severity</th><th>Bug</th><th>Fix</th></tr>
+<tr><td>A1</td><td class="p0">CRITICAL</td><td><b>Login NPEs.</b> <code>login()</code>: if userClient.loginUser returns null or throws Feign 404, <code>user.getPassword()</code> NPEs -> 500 instead of 401. Same in <code>loginDriver()</code> - no null check at all.</td><td class="fix">Null-check the DTO; catch FeignException.NotFound -> throw InvalidCredentialsException. Return 401 uniformly.</td></tr>
+<tr><td>A2</td><td class="p0">CRITICAL</td><td><b>JwtFilter crashes on expired/malformed tokens.</b> <code>jwtService.extractUsername(jwt)</code> is called outside any try/catch - ExpiredJwtException propagates -> HTTP 500. Every service's filter has this bug.</td><td class="fix">Wrap extraction in try/catch; on failure just continue the chain unauthenticated (security config then returns 401/403 properly).</td></tr>
+<tr><td>A3</td><td class="p1">HIGH</td><td><b>Logout doesn't validate the token.</b> <code>getExpirationTime(token)</code> throws on malformed/expired tokens -> 500. Also blacklist is only checked at the gateway - Auth-Service's own filter ignores it, so direct-port calls bypass logout.</td><td class="fix">Validate token before blacklisting; check blacklist inside JwtFilter too (defense in depth).</td></tr>
+<tr><td>A4</td><td class="p1">HIGH</td><td><b>Refresh token dead code.</b> generateRefreshToken() exists but no /refresh endpoint - tokens just expire after 24h forcing re-login.</td><td class="fix">Add refresh endpoint + rotation, or remove dead code.</td></tr>
+<tr><td>A5</td><td class="p1">HIGH</td><td><b>httpBasic enabled</b> alongside JWT (AuthSecurity line 59) - basic auth attempts hit DaoAuthenticationProvider/UserDetailsService unnecessarily; attack surface + confusing auth.</td><td class="fix">Remove httpBasic.</td></tr>
+<tr><td>A6</td><td class="p2">MED</td><td>Debug timing printlns in login(); AuthSecurity permitAll lists paths that don't exist in this service (/api/users/*, /api/driver/*) - harmless but misleading; duplicate method name registerUser overloaded for driver register.</td><td class="fix">Clean up; keep security matchers accurate.</td></tr>
+</table>
+
+<h2>3. user-service</h2>
+<table>
+<tr><th>#</th><th>Severity</th><th>Bug</th><th>Fix</th></tr>
+<tr><td>U1</td><td class="p0">CRITICAL</td><td><b>Password hashes exposed publicly.</b> mapToDto() includes <code>password</code>; <code>/api/users/id/**</code> and <code>/api/users/email/{email}</code> are permitAll - anyone can enumerate user IDs/emails and harvest BCrypt hashes for offline cracking.</td><td class="fix">Remove password from UserResponseDto (use a separate internal DTO for auth-service login), and require auth on these endpoints.</td></tr>
+<tr><td>U2</td><td class="p0">CRITICAL</td><td><b>getProfile() returns the FIRST user in the whole table.</b> <code>findAll().stream().findFirst()</code> - loads every user into memory and returns an arbitrary one. Any caller gets someone else's profile.</td><td class="fix">Delete or rewrite: resolve user from SecurityContext/JWT identity.</td></tr>
+<tr><td>U3</td><td class="p0">CRITICAL</td><td><b>updateProfile has no ownership check.</b> It finds the user by the email IN THE REQUEST BODY - any authenticated user can overwrite any other user's name/phone/email.</td><td class="fix">Take userId/email from the JWT principal, ignore client-supplied identity fields.</td></tr>
+<tr><td>U4</td><td class="p1">HIGH</td><td><b>Sharding is broken/incomplete.</b> ShardContext.setShard() is only called in registerUser/loginUser - getByEmail, updateProfile, getUserById, deleteUser, getAllUsers never set it -> queries hit the default/no shard -> "User not found" for sharded users. Also setShard is not in try/finally - an exception leaks the ThreadLocal to the next request on that thread.</td><td class="fix">Set shard in a try/finally (or AOP interceptor keyed on email); apply to ALL repo calls; note RoutingDataSource has no @Bean config found - verify sharding is even wired.</td></tr>
+<tr><td>U5</td><td class="p1">HIGH</td><td><b>GET with @RequestBody.</b> <code>GET /api/users/search/ride</code> takes @RequestBody - GET bodies are stripped by many proxies/clients; endpoint is unreliable.</td><td class="fix">Change to POST.</td></tr>
+<tr><td>U6</td><td class="p1">HIGH</td><td><b>No duplicate-email check</b> in registerUser - duplicate accounts possible; findByEmail then returns arbitrary one -> login ambiguity.</td><td class="fix">Check existsByEmail first; add unique constraint on email.</td></tr>
+<tr><td>U7</td><td class="p1">HIGH</td><td><b>Jwtfilter same crash bug</b> (extractUsername outside try/catch) + loadUserByUsername does findByEmail WITHOUT shard context -> JWT auth fails for users on non-default shards.</td><td class="fix">Try/catch + set shard before lookup.</td></tr>
+<tr><td>U8</td><td class="p2">MED</td><td>Unused bouncycastle import; debug timing printlns; getAllUsers/searchUsers unpaginated and return password hashes; UserDetailsServiceClass grants authority "ROLE_"+status (e.g. ROLE_ACTIVE) not the actual role - authority model is wrong.</td><td class="fix">Clean up; paginate; fix authority to use user.getRole().</td></tr>
+</table>
+
+<h2>4. driver-service</h2>
+<table>
+<tr><th>#</th><th>Severity</th><th>Bug</th><th>Fix</th></tr>
+<tr><td>D1</td><td class="p0">CRITICAL</td><td><b>Location update resets status to AVAILABLE unconditionally.</b> updateDriverLocation() sets <code>status=AVAILABLE</code> on every ping - a BUSY or INPROGRESS driver keeps reporting location and gets flipped back to AVAILABLE mid-trip -> matched to new rides while occupied.</td><td class="fix">Only set AVAILABLE if current status allows (e.g. OFFLINE->AVAILABLE); never downgrade BUSY/INPROGRESS.</td></tr>
+<tr><td>D2</td><td class="p0">CRITICAL</td><td><b>/api/driver/accept/ride is permitAll.</b> Anyone can POST any driverId and set that driver BUSY - no auth, no ride validation. Also duplicates the Kafka consumer logic (double status writes).</td><td class="fix">Require auth + verify the driver owns/is assigned; better: remove endpoint entirely and rely on the ride-accepted Kafka event.</td></tr>
+<tr><td>D3</td><td class="p0">CRITICAL</td><td><b>Missing @KafkaListener on consume1()</b> (ride-started-topic) - dead code; drivers never transition to INPROGRESS via events.</td><td class="fix">Add @KafkaListener or split into separate consumer methods.</td></tr>
+<tr><td>D4</td><td class="p1">HIGH</td><td><b>Stale cache.</b> @Cacheable on getDriverById/getDriverByEmail but acceptRide/location/status changes never @CacheEvict -> ride-service gets stale driver data indefinitely.</td><td class="fix">Evict on every mutation, or drop caching for mutable fields.</td></tr>
+<tr><td>D5</td><td class="p1">HIGH</td><td><b>findNearbyDrivers N+1 + fragile.</b> One findById per geo result; a single stale geo entry (deleted driver) throws orElseThrow -> whole search 500s. Also geo Redis entries are never removed on offline -> ghost drivers in results.</td><td class="fix">Batch-fetch (findAllById), filter missing instead of throwing, remove geo member when driver goes offline, add TTL/refresh.</td></tr>
+<tr><td>D6</td><td class="p1">HIGH</td><td><b>No ownership check on PUT /location.</b> Any authenticated driver token can update ANY driver's location (driverId in body, never compared to JWT identity).</td><td class="fix">Compare driverId to principal; reject mismatches.</td></tr>
+<tr><td>D7</td><td class="p1">HIGH</td><td><b>JwtFilter crash bug</b> (same as others) + DriverUserService.loadUserByUsername throws UsernameNotFoundException for RIDER tokens -> rider calling driver endpoints gets 500 not 403. Authority granted as "DRIVER" without ROLE_ prefix so hasRole() checks would fail anyway.</td><td class="fix">Try/catch in filter; catch UsernameNotFoundException -> continue unauthenticated; use "ROLE_"+role.</td></tr>
+<tr><td>D8</td><td class="p2">MED</td><td>loginDriver returns password hash (needed by auth-service but endpoint is permitAll - hash oracle); createDriver stores password as-received (plaintext if called directly, bypassing auth-service encoding); DriverResponseDto omits status/online so consumers can't see availability; value.default.type pinned to RideAcceptedEvent blocks second event type; printlns everywhere.</td><td class="fix">Internal-only login endpoint or signed service token; encode defensively; add fields; fix deserializer config.</td></tr>
+</table>
+
+<h2>5. ride-service</h2>
+<table>
+<tr><th>#</th><th>Severity</th><th>Bug</th><th>Fix</th></tr>
+<tr><td>R1</td><td class="p0">CRITICAL</td><td><b>payment-success endpoint is unauthenticated AND permitAll.</b> SecurityConfig permitAlls literally every /api/ride/** path. Via the gateway any logged-in user (or direct port 8080, no auth at all) can call <code>PUT /api/ride/payment-success/{rideId}</code> and mark a PAYMENT_PENDING ride COMPLETED without paying - free rides.</td><td class="fix">Require authentication + verify caller is Payment-Service (service token/mTLS/internal header) or move completion fully to the Kafka payment-success consumer. Never expose this endpoint publicly.</td></tr>
+<tr><td>R2</td><td class="p0">CRITICAL</td><td><b>All ride endpoints permitAll at service level.</b> createRide/completeRide/startRide/verifyOtp have zero authorization - anyone can create rides as any userId, complete any ride, start any ride (direct port access bypasses gateway entirely).</td><td class="fix">Authenticate at service level too (defense in depth); verify userId/driverId in requests match JWT principal.</td></tr>
+<tr><td>R3</td><td class="p1">HIGH</td><td><b>Race conditions.</b> updateRide/startRide/completeRide do read-check-write with no locking - two concurrent accepts/starts/completes can both pass the status check. No @Version on Ride entity.</td><td class="fix">Add @Version optimistic locking or SELECT ... FOR UPDATE; rely on DB unique constraints.</td></tr>
+<tr><td>R4</td><td class="p1">HIGH</td><td><b>OTP weaknesses.</b> 4-digit OTP, no attempt counter/lockout (brute-forceable in ~10k tries), Redis key not deleted when ride completes/cancels (stays valid 60min).</td><td class="fix">6 digits + max 5 attempts then invalidate; delete key on ride end/cancel.</td></tr>
+<tr><td>R5</td><td class="p1">HIGH</td><td><b>JwtFilter is decorative.</b> Sets authentication with null principal + empty authorities; isTokenValid outside try/catch -> expired token = 500; InMemoryUserDetailsManager bean is empty/pointless.</td><td class="fix">Proper principal extraction or remove filter; try/catch; delete dead bean.</td></tr>
+<tr><td>R6</td><td class="p1">HIGH</td><td><b>Completeride PAYMENT_PENDING path</b> calls paymentClient.getPaymentByRideId - if payment row missing (edge case) -> PaymentNotFOund -> 500 with no recovery.</td><td class="fix">Handle gracefully - offer to create payment if none exists.</td></tr>
+<tr><td>R7</td><td class="p2">MED</td><td>Sync payment callback fragility (covered in Kafka report); ~20 debug printlns; no cancel-ride endpoint at all (rides can only end via complete); fare = 40 + 12/km hardcoded with no surge/night config; searchRide returns ALL nearby drivers unpaginated.</td><td class="fix">See Kafka report for payment-success-topic; add cancel flow; externalize fare config.</td></tr>
+</table>
+
+<h2>6. Payment-Service</h2>
+<table>
+<tr><th>#</th><th>Severity</th><th>Bug</th><th>Fix</th></tr>
+<tr><td>P1</td><td class="p0">CRITICAL</td><td><b>Security completely disabled.</b> SecurityConfig.java and JwtFilter.java are 100% commented out - Spring Security either absent or default. <code>POST /api/payment/create</code> is wide open: anyone can create a Razorpay payment link for ANY rideId/userId/driverId with ANY amount.</td><td class="fix">Re-enable security: webhook permitAll (signature-verified), create/ride endpoints authenticated + role check. At minimum require the gateway/internal token.</td></tr>
+<tr><td>P2</td><td class="p0">CRITICAL</td><td><b>No amount verification.</b> createPayment trusts request.amount blindly - never calls RideFeign (exists but unused!) to check the fare. Underpayment = ride marked complete for less.</td><td class="fix">Fetch ride via RideFeign.getRideById and verify amount == ride.fare before creating the link.</td></tr>
+<tr><td>P3</td><td class="p0">CRITICAL</td><td><b>Idempotency deadlock.</b> If createPayment fails with anything OTHER than RazorpayException (Feign down, user not found, DB error), the Idempotency row stays PROCESSING forever. Retry with same key (ride-service always uses rideId as key) -> "Duplicate payment request" permanently - that ride can NEVER get a payment link.</td><td class="fix">Wrap whole method: on ANY exception set status FAILED (or delete the row); only treat COMPLETED as duplicate. Also catch IllegalArgumentException for non-UUID idempotency keys -> 400 not 500.</td></tr>
+<tr><td>P4</td><td class="p0">CRITICAL</td><td><b>payment.captured webhook always fails.</b> Reconstructs link id as "plink_" + description, but description = "Ride Payment : rideId" -> findByGatewayOrderId never matches -> PaymentNotFOund -> webhook 500 -> Razorpay retries forever.</td><td class="fix">Set payment_link.reference_id or notes to the plink id / rideId at creation and read it from the webhook payload; or handle only payment_link.paid.</td></tr>
+<tr><td>P5</td><td class="p1">HIGH</td><td><b>Webhook ordering fragility.</b> Order: save SUCCESS -> rideClient.paymentSuccess -> getUserById -> sendPaymentReceipt. If email/Feign fails AFTER payment=SUCCESS, webhook returns 500; Razorpay retries but handler early-returns on SUCCESS -> ride notified? (ride call already happened) but receipt email NEVER retried - silent loss.</td><td class="fix">Reorder: notify ride first, then email; wrap email in try/catch + async/Kafka (see Kafka report); or make each step independently retryable.</td></tr>
+<tr><td>P6</td><td class="p1">HIGH</td><td><b>findByGatewayOrderId returns Optional&lt;Object&gt;</b> + cast in service - type-unsafe; works by accident.</td><td class="fix">Change signature to Optional&lt;Payment&gt;.</td></tr>
+<tr><td>P7</td><td class="p1">HIGH</td><td><b>Second payment for same ride.</b> rideId has unique=true - if a SUCCESS/other payment exists, createPayment falls through to insert -> DataIntegrityViolation 500. Also PENDING-payment early-return only handles PENDING status.</td><td class="fix">Handle all existing statuses explicitly; return existing payment or clear error.</td></tr>
+<tr><td>P8</td><td class="p2">MED</td><td>GLobalLevel.handleException missing @ExceptionHandler annotation (dead code - generic exceptions unhandled); unused PublicKey import; RideFeign + RideResponseDto unused; PaymentMethods.UPI hardcoded; full webhook payload println logs customer PII; hardcoded localhost Feign URLs; no webhook replay/event-id dedup beyond status check.</td><td class="fix">Clean up; add @ExceptionHandler(Exception.class); mask PII in logs; use Eureka names.</td></tr>
+</table>
+
+<h2>7. Notification-Service</h2>
+<table>
+<tr><th>#</th><th>Severity</th><th>Bug</th><th>Fix</th></tr>
+<tr><td>N1</td><td class="p0">CRITICAL</td><td><b>Synchronous email in payment webhook path.</b> Payment-Service Feign-calls /api/email/payment-receipt inside handleWebhook; SMTP failure -> 500 -> see P5 (receipt permanently lost, no retry).</td><td class="fix">Move to Kafka consumer (payment-success-topic) with retry + DLQ - see Kafka report.</td></tr>
+<tr><td>N2</td><td class="p1">HIGH</td><td><b>Hardcoded sender.</b> helper.setFrom("prasadvirdande@gmail.com") - personal Gmail; will fail SPF/DKIM or land in spam; not configurable.</td><td class="fix">Externalize to properties (spring.mail.username or dedicated from-address); use verified domain sender.</td></tr>
+<tr><td>N3</td><td class="p1">HIGH</td><td><b>Invoice number = "INV-" + currentTimeMillis</b> - collision if two invoices generated in same millisecond; not sequential/auditable.</td><td class="fix">DB sequence or UUID-based number with unique constraint.</td></tr>
+<tr><td>N4</td><td class="p1">HIGH</td><td><b>No security config visible</b> - no Security folder; if spring-security is on classpath without config, default chain may block or (worse) the service is open depending on deps. Verify.</td><td class="fix">Add explicit SecurityConfig: permit /api/email/** only from internal network or require service token; everything else denied.</td></tr>
+<tr><td>N5</td><td class="p2">MED</td><td>Dead code: NotificationService.java and NotificationConfig.java are empty classes; EmailRequestDTO unused; PDF stored as byte[] blob in MySQL (heavy - consider filesystem/S3 + DB reference); no @Async anywhere; no tests.</td><td class="fix">Delete dead code; @Async + thread pool; externalize PDF storage.</td></tr>
+</table>
+
+<h2>8. Cross-Cutting (all services)</h2>
+<table>
+<tr><th>#</th><th>Severity</th><th>Bug</th><th>Fix</th></tr>
+<tr><td>X1</td><td class="p0">CRITICAL</td><td><b>Every JwtFilter has the same crash bug</b> - extractUsername() outside try/catch -> expired/malformed token = HTTP 500 instead of 401. Present in Auth, user, driver, ride services.</td><td class="fix">Copy one correct filter implementation everywhere: try { extract+validate } catch { continue unauthenticated }.</td></tr>
+<tr><td>X2</td><td class="p0">CRITICAL</td><td><b>Defense-in-depth missing.</b> ride-service and Payment-Service trust the gateway completely (permitAll / no security). Direct port access bypasses ALL auth. In a real deployment, service ports must not be publicly reachable AND services should validate tokens themselves.</td><td class="fix">Network-level isolation (only gateway can reach services) + service-level JWT validation.</td></tr>
+<tr><td>X3</td><td class="p1">HIGH</td><td><b>Plaintext secrets in git</b> - Razorpay secret, JWT secret, MySQL root password in every application.properties.</td><td class="fix">Env vars / secrets manager; rotate exposed credentials.</td></tr>
+<tr><td>X4</td><td class="p1">HIGH</td><td><b>Shared authdb</b> across all services + ddl-auto=update + show-sql + devtools enabled.</td><td class="fix">DB-per-service, Flyway migrations, prod profile.</td></tr>
+<tr><td>X5</td><td class="p1">HIGH</td><td><b>No input validation anywhere</b> - zero @Valid; DTOs accept anything (negative amounts, null IDs, huge strings).</td><td class="fix">spring-boot-starter-validation + constraints on all request DTOs.</td></tr>
+<tr><td>X6</td><td class="p1">HIGH</td><td><b>System.out.println everywhere</b> (~50+ statements) incl. full webhook payloads with customer PII, OTPs, tokens-adjacent data.</td><td class="fix">SLF4J with levels; never log PII/tokens/payloads.</td></tr>
+<tr><td>X7</td><td class="p2">MED</td><td>No pagination on any list endpoint; no tests beyond context-load; no actuator/health (except one auth endpoint); no API versioning; no rate limiting; Kafka consumer config issues (missing listener, single-type deserializer, duplicated event DTOs).</td><td class="fix">See production-readiness PDF for the full hardening list.</td></tr>
+</table>
+
+<h2>9. Suggested Fix Order</h2>
+<pre>DAY 1 - Stop the bleeding:
+  1. Gateway: fix /api/users/** + /api/email/** routes; whitelist /api/payment/webhook (G1-G3)
+  2. Gateway: forward X-User-* identity headers (G4)
+  3. ride-service: lock down payment-success + all endpoints (R1-R2)
+  4. Payment-Service: re-enable security on /api/payment/create (P1)
+  5. user-service: strip password from DTOs + auth the id/email endpoints (U1)
+  6. Payment-Service: fix idempotency deadlock (P3) - rides permanently blocked today
+
+DAY 2-3 - Correctness:
+  7. driver-service: fix AVAILABLE reset bug (D1) + accept/ride auth (D2) + Kafka listener (D3)
+  8. Payment-Service: amount verification via RideFeign (P2) + payment.captured fix (P4)
+  9. All services: fix JwtFilter try/catch (X1)
+ 10. user-service: getProfile + updateProfile ownership (U2-U3) + sharding try/finally (U4)
+
+WEEK 2+: hardening per PRODUCTION_IMPROVEMENTS.pdf (secrets, validation, tests, Kafka events, tracing)</pre>
+
+<div class="high"><b>Total: 7 critical, 14 high, 12 medium bugs found across 8 services.</b> The critical cluster is authentication/authorization - the system currently trusts the gateway completely, several services are wide open on their direct ports, and the payment flow has three independent ways to break or be exploited.</div>
+
+</body></html>
